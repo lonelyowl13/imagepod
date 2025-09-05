@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imagepod-api
+  namespace: imagepod
+  labels:
+    app: imagepod-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: imagepod-api
+  template:
+    metadata:
+      labels:
+        app: imagepod-api
+    spec:
+      containers:
+      - name: api
+        image: imagepod/api:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DATABASE_URL
+          value: postgresql://imagepod:$(POSTGRES_PASSWORD)@postgres:5432/imagepod
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@redis:6379/0
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: imagepod-secrets
+              key: secret-key
+        - name: REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: imagepod-secrets
+              key: registration-token
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: imagepod-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: imagepod-secrets
+              key: redis-password
+        - name: API_HOST
+          value: "0.0.0.0"
+        - name: API_PORT
+          value: "8000"
+        - name: DEBUG
+          value: "false"
+        - name: LOG_LEVEL
+          value: "INFO"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: api-logs
+          mountPath: /app/logs
+      volumes:
+      - name: api-logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: imagepod-api
+  namespace: imagepod
+  labels:
+    app: imagepod-api
+spec:
+  selector:
+    app: imagepod-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: imagepod-api-headless
+  namespace: imagepod
+  labels:
+    app: imagepod-api
+spec:
+  selector:
+    app: imagepod-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  clusterIP: None

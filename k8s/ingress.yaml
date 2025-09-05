@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: imagepod-ingress
+  namespace: imagepod
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  rules:
+  - host: imagepod.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: imagepod-api
+            port:
+              number: 8000
+  - host: api.imagepod.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: imagepod-api
+            port:
+              number: 8000
+---
+# Alternative: NodePort for direct access
+apiVersion: v1
+kind: Service
+metadata:
+  name: imagepod-api-nodeport
+  namespace: imagepod
+  labels:
+    app: imagepod-api
+spec:
+  selector:
+    app: imagepod-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30080
+    name: http
+  type: NodePort
