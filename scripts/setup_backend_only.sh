@@ -120,8 +120,12 @@ cd /opt/imagepod
 # Create environment file
 print_status "Creating environment configuration..."
 if [ ! -f ".env" ]; then
-    cp env.example .env
-    print_warning "Please edit .env file with your configuration"
+    # Generate secure secrets
+    print_status "Generating secure secrets..."
+    ./scripts/generate_secrets.sh
+    print_success "Environment configuration created with secure secrets"
+else
+    print_warning ".env file already exists, skipping secret generation"
 fi
 
 # Create systemd service for ImagePod
