@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: imagepod-gpu-worker
+  namespace: imagepod
+  labels:
+    app: imagepod-gpu-worker
+spec:
+  selector:
+    matchLabels:
+      app: imagepod-gpu-worker
+  template:
+    metadata:
+      labels:
+        app: imagepod-gpu-worker
+    spec:
+      # Only run on nodes with GPUs
+      nodeSelector:
+        accelerator: nvidia-tesla-gpu
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: gpu-worker
+        image: imagepod/gpu-worker:latest
+        imagePullPolicy: Always
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: API_ENDPOINT
+          value: "http://imagepod-api.imagepod.svc.cluster.local:8000"
+        - name: REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: imagepod-secrets
+              key: registration-token
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            nvidia.com/gpu: 1
+            memory: "4Gi"
+            cpu: "2"
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: websocket
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: nvidia-driver
+          mountPath: /usr/local/nvidia
+          readOnly: true
+        - name: nvidia-mps
+          mountPath: /tmp/nvidia-mps
+        - name: nvidia-uvm
+          mountPath: /dev/nvidia-uvm
+        - name: nvidia-ctl
+          mountPath: /dev/nvidiactl
+        - name: nvidia-devices
+          mountPath: /dev/nvidia0
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: nvidia-driver
+        hostPath:
+          path: /usr/local/nvidia
+      - name: nvidia-mps
+        hostPath:
+          path: /tmp/nvidia-mps
+      - name: nvidia-uvm
+        hostPath:
+          path: /dev/nvidia-uvm
+      - name: nvidia-ctl
+        hostPath:
+          path: /dev/nvidiactl
+      - name: nvidia-devices
+        hostPath:
+          path: /dev/nvidia0
+      restartPolicy: Always

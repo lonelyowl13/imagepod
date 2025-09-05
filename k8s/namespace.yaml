@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: imagepod
+  labels:
+    name: imagepod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: imagepod-secrets
+  namespace: imagepod
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual values
+  registration-token: cmVnaXN0cmF0aW9uLXRva2VuLWV4YW1wbGU=  # registration-token-example
+  api-key: YXBpLWtleS1leGFtcGxl  # api-key-example
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: imagepod-config
+  namespace: imagepod
+data:
+  api-endpoint: "http://imagepod-api.imagepod.svc.cluster.local:8000"
+  log-level: "INFO"
+  heartbeat-interval: "30"
+  max-concurrent-jobs: "1"
+  gpu-memory-threshold: "0.8"
+  cpu-threshold: "0.8"
