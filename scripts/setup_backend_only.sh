@@ -111,7 +111,10 @@ fi
 
 # Copy ImagePod files
 print_status "Copying ImagePod files..."
-cp -r /home/alisa/Projects/imagepod/* /opt/imagepod/
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cp -r "$PROJECT_DIR"/* /opt/imagepod/
 cd /opt/imagepod
 
 # Create environment file

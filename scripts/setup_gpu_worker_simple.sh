@@ -133,7 +133,10 @@ fi
 
 # Copy worker agent files
 print_status "Copying worker agent files..."
-cp -r worker_agent/* /opt/imagepod-gpu-worker/
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cp -r "$PROJECT_DIR/worker_agent"/* /opt/imagepod-gpu-worker/
 cd /opt/imagepod-gpu-worker
 
 # Create environment file
