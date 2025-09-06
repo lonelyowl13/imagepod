@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ImagePod Kubernetes Worker Node Setup Script
+# ImagePod Kubernetes Worker Node Setup Script (FIXED)
 # This script sets up Kubernetes worker node WITH GPU support
 
 set -e
@@ -50,22 +50,22 @@ echo ""
 
 # Update system packages
 print_status "Updating system packages..."
-# sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get update && sudo apt-get upgrade -y
 
-# # Install required packages
-# print_status "Installing required packages..."
-# sudo apt-get install -y \
-#     apt-transport-https \
-#     ca-certificates \
-#     curl \
-#     gnupg \
-#     lsb-release \
-#     software-properties-common \
-#     wget \
-#     git \
-#     vim \
-#     htop \
-#     net-tools
+# Install required packages
+print_status "Installing required packages..."
+sudo apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    wget \
+    git \
+    vim \
+    htop \
+    net-tools
 
 # Install Docker
 print_status "Installing Docker..."
@@ -121,10 +121,6 @@ if ! command -v nvidia-ctk &> /dev/null; then
     sudo apt-get update
     sudo apt-get install -y nvidia-container-toolkit
     
-    # Configure containerd
-    sudo nvidia-ctk runtime configure --runtime=containerd
-    sudo systemctl restart containerd
-    
     print_success "NVIDIA Container Toolkit installed successfully"
 else
     print_success "NVIDIA Container Toolkit is already installed"
@@ -146,9 +142,14 @@ fi
 # Install kubeadm, kubelet, and kubectl
 print_status "Installing Kubernetes components..."
 if ! command -v kubeadm &> /dev/null; then
-    # Add Kubernetes repository
-    curl -sS https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/kubernetes-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+    # Remove any existing broken repository
+    sudo rm -f /etc/apt/sources.list.d/kubernetes.list
+    sudo rm -f /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    sudo rm -f /usr/share/keyrings/kubernetes-archive-keyring.gpg
+    
+    # Add the NEW working Kubernetes repository
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
     
     # Install Kubernetes components
     sudo apt-get update
@@ -185,7 +186,7 @@ EOF
 
 sudo sysctl --system
 
-# Configure containerd (WITH NVIDIA support)
+# Configure containerd (WITH NVIDIA support) - FIXED VERSION
 print_status "Configuring containerd with NVIDIA support..."
 sudo mkdir -p /etc/containerd
 sudo tee /etc/containerd/config.toml <<EOF
@@ -197,15 +198,34 @@ version = 2
         runtime_type = "io.containerd.runc.v2"
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
           SystemdCgroup = true
-      [plugins."io.containerd.grpc.v1.cri"].containerd.runtimes.nvidia]
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
         runtime_type = "io.containerd.runc.v2"
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
           BinaryName = "nvidia-container-runtime"
           SystemdCgroup = true
 EOF
 
+# Configure NVIDIA Container Toolkit
+print_status "Configuring NVIDIA Container Toolkit..."
+sudo nvidia-ctk runtime configure --runtime=containerd
+
+# Restart containerd
+print_status "Restarting containerd service..."
 sudo systemctl restart containerd
 sudo systemctl enable containerd
+
+# Wait for containerd to start
+sleep 3
+
+# Verify containerd is working
+print_status "Verifying containerd is working..."
+if sudo systemctl is-active --quiet containerd; then
+    print_success "containerd is running successfully!"
+else
+    print_error "containerd failed to start. Let's check the logs..."
+    sudo journalctl -u containerd --no-pager -l
+    exit 1
+fi
 
 print_success "Kubernetes Worker Node setup completed!"
 echo ""
