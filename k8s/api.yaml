@@ -23,9 +23,9 @@ spec:
           name: http
         env:
         - name: DATABASE_URL
-          value: postgresql://imagepod:$(POSTGRES_PASSWORD)@postgres:5432/imagepod
+          value: postgresql://imagepod:$(POSTGRES_PASSWORD)@postgres:15432/imagepod
         - name: REDIS_URL
-          value: redis://:$(REDIS_PASSWORD)@redis:6379/0
+          value: redis://:$(REDIS_PASSWORD)@redis:16379/0
         - name: SECRET_KEY
           valueFrom:
             secretKeyRef:

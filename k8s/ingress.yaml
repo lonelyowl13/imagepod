@@ -7,6 +7,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ingress-class: "nginx"
 spec:
   rules:
   - host: imagepod.local
@@ -44,6 +45,23 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
-    nodePort: 30080
+    nodePort: 38080
     name: http
   type: NodePort
+---
+# LoadBalancer service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: imagepod-api-loadbalancer
+  namespace: imagepod
+  labels:
+    app: imagepod-api
+spec:
+  selector:
+    app: imagepod-api
+  ports:
+  - port: 18080
+    targetPort: 8000
+    name: http
+  type: LoadBalancer
