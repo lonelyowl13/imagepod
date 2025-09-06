@@ -1,147 +1,123 @@
-# ImagePod Setup Scripts
+# ImagePod Scripts
 
-This directory contains setup scripts for deploying ImagePod in different configurations.
+This directory contains simplified scripts for setting up and deploying ImagePod.
 
-## 📋 **Available Scripts**
+## 🚀 Quick Setup
 
-### **Backend Setup**
-- `setup_backend_only.sh` - Sets up ImagePod backend on a simple server (no GPU required)
+### Master Node (Backend + Kubernetes Control Plane)
+```bash
+./scripts/setup_master.sh
+```
+This script:
+- Installs Docker, Kubernetes, and all dependencies
+- Initializes the Kubernetes cluster
+- Deploys ImagePod backend services
+- Provides the join command for worker nodes
 
-### **GPU Worker Setup**
-- `setup_gpu_worker_simple.sh` - Sets up GPU worker on a GPU server using Docker
-- `setup_kubernetes.sh` - Sets up Kubernetes cluster with GPU support
+### GPU Worker Node
+```bash
+./scripts/setup_worker.sh 'kubeadm join <master-ip>:6443 --token <token> --discovery-token-ca-cert-hash <hash>'
+```
+This script:
+- Installs NVIDIA drivers (if not present)
+- Installs Docker, Kubernetes, and GPU support
+- Joins the cluster using the provided command
+- Deploys GPU worker agent
 
-### **Deployment Scripts**
-- `deploy_gpu_workers.sh` - Deploys GPU workers to Kubernetes
-- `init_db.py` - Initializes the database
+## 📋 Other Scripts
 
-## 🚀 **Quick Start**
+### Deployment Scripts
+- `deploy_full_kubernetes.sh` - Deploys all ImagePod services to Kubernetes
+- `deploy_gpu_workers.sh` - Deploys GPU worker DaemonSet and services
 
-### **Option 1: Simple Backend + GPU Workers (Recommended)**
+### Utility Scripts
+- `init_db.py` - Initialize the database with required tables and data
+- `generate_secrets.sh` - Generates secure random strings for application secrets
+- `validate_manifests.sh` - Validates Kubernetes YAML manifests locally
+- `shutdown.sh` - **NEW: Completely shuts down and removes all ImagePod services**
 
-1. **Backend Server (No GPU)**
-   ```bash
-   ./scripts/setup_backend_only.sh
-   ```
+## 🎯 Usage Examples
 
-2. **GPU Worker Server**
-   ```bash
-   export API_ENDPOINT="http://your-backend-server:8000"
-   export REGISTRATION_TOKEN="your-secure-token"
-   ./scripts/setup_gpu_worker_simple.sh
-   ```
+### Complete Setup (2 machines)
 
-### **Option 2: Kubernetes Cluster**
+**On Master Node:**
+```bash
+# Clone the repository
+git clone <your-repo>
+cd imagepod
 
-1. **Backend Server (No GPU)**
-   ```bash
-   ./scripts/setup_backend_only.sh
-   ```
+# Run master setup
+./scripts/setup_master.sh
 
-2. **GPU Worker Cluster**
-   ```bash
-   ./scripts/setup_kubernetes.sh
-   ./scripts/deploy_gpu_workers.sh
-   ```
+# Copy the join command from the output
+```
 
-## 🔧 **Script Features**
+**On GPU Worker Node:**
+```bash
+# Clone the repository
+git clone <your-repo>
+cd imagepod
 
-### **Automatic Path Detection**
-All scripts automatically detect their location and work from any directory:
-- No hardcoded paths
-- Works when cloned to any location
-- Portable across different systems
+# Run worker setup with join command
+./scripts/setup_worker.sh 'kubeadm join 192.168.1.100:6443 --token abc123... --discovery-token-ca-cert-hash sha256:...'
+```
 
-### **Environment Configuration**
-Scripts create configuration files with sensible defaults:
-- `.env` files for environment variables
-- Docker Compose configurations
-- Systemd service files
+### Check Status
+```bash
+# On master node
+kubectl get nodes
+kubectl get pods -n imagepod
 
-### **Error Handling**
-- Comprehensive error checking
-- Colored output for better readability
-- Graceful failure handling
+# Access ImagePod API
+kubectl port-forward -n imagepod svc/imagepod-api 8000:8000
+```
 
-## 📁 **What Each Script Does**
+### Shutdown Everything
+```bash
+# On any node (master or worker)
+./scripts/shutdown.sh
+```
+**⚠️ Warning: This will completely remove all ImagePod services and data!**
 
-### **setup_backend_only.sh**
-- Installs Docker and Docker Compose
-- Copies ImagePod files to `/opt/imagepod`
-- Creates systemd service
-- Sets up environment configuration
+## 🔧 Requirements
 
-### **setup_gpu_worker_simple.sh**
-- Installs Docker with NVIDIA support
-- Installs NVIDIA drivers and Container Toolkit
-- Copies worker agent files to `/opt/imagepod-gpu-worker`
-- Creates systemd service for GPU worker
+- **Master Node**: Ubuntu 20.04+, Debian 11+, or Arch Linux
+- **Worker Node**: Ubuntu 20.04+, Debian 11+, or Arch Linux + NVIDIA GPU
+- Internet connection
+- sudo access
 
-### **setup_kubernetes.sh**
-- Installs Kubernetes components
-- Configures NVIDIA GPU support
-- Sets up cluster networking
-- Installs NVIDIA Device Plugin
+## 📝 Notes
 
-## 🔍 **Troubleshooting**
+- Scripts automatically detect the operating system
+- GPU worker setup will prompt for reboot if NVIDIA drivers need installation
+- All scripts include error handling and colored output
+- The master script saves the join command to `/tmp/kubeadm-join-command.txt`
 
-### **Permission Issues**
+## 🔍 Troubleshooting
+
+### Permission Issues
 ```bash
 # Make scripts executable
 chmod +x scripts/*.sh
-
-# Run with sudo if needed
-sudo ./scripts/setup_backend_only.sh
 ```
 
-### **Path Issues**
-Scripts automatically detect their location, but if you encounter issues:
+### NVIDIA Driver Issues
 ```bash
-# Run from project root
-cd /path/to/imagepod
-./scripts/setup_backend_only.sh
+# Check if NVIDIA drivers are installed
+nvidia-smi
+
+# If not installed, the worker script will install them and prompt for reboot
 ```
 
-### **Network Issues**
+### Network Issues
 ```bash
-# Check internet connectivity
-ping google.com
-
 # Check if ports are available
 netstat -tulpn | grep :8000
+netstat -tulpn | grep :6443
 ```
 
-## 📚 **Configuration**
-
-### **Environment Variables**
-Set these before running GPU worker setup:
-```bash
-export API_ENDPOINT="http://your-backend-server:8000"
-export REGISTRATION_TOKEN="your-secure-token"
-export WORKER_PORT="8080"
-```
-
-### **Custom Configuration**
-Edit configuration files after setup:
-```bash
-# Backend configuration
-sudo nano /opt/imagepod/.env
-
-# GPU worker configuration
-nano /opt/imagepod-gpu-worker/.env
-```
-
-## 🎯 **Next Steps**
-
-After running the setup scripts:
-
-1. **Configure your environment** - Edit `.env` files
-2. **Start services** - Use systemctl commands
-3. **Test the system** - Check health endpoints
-4. **Monitor logs** - Use journalctl or docker logs
-
-## 📖 **Documentation**
+## 📖 Documentation
 
 - [Deployment Guide](../DEPLOYMENT_GUIDE.md) - Complete deployment instructions
-- [Kubernetes Setup](../KUBERNETES_SETUP.md) - Kubernetes-specific setup
-- [GPU Workers](../GPU_WORKERS.md) - GPU worker system documentation
+- [Kubernetes Setup](../KUBERNETES_FULL_INFRASTRUCTURE.md) - Kubernetes-specific setup
+- [GPU Workers](../KUBERNETES_NODE_TYPES.md) - GPU worker system documentation
