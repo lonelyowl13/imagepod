@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# ImagePod Kubernetes Master Node Setup Script
+# ImagePod Kubernetes Master Node Setup Script for Arch Linux
 # This script sets up Kubernetes master node WITHOUT GPU support
 
 set -e
 
 # Configuration
 KUBERNETES_VERSION="1.28"
-CONTAINERD_VERSION="1.7.6"
 
 # Colors for output
 RED='\033[0;31m'
@@ -44,48 +43,39 @@ if ! command -v sudo &> /dev/null; then
     exit 1
 fi
 
-print_status "Starting Kubernetes Master Node setup (NO GPU)..."
+print_status "Starting Kubernetes Master Node setup for Arch Linux (NO GPU)..."
 echo ""
 
 # Update system packages
 print_status "Updating system packages..."
-sudo apt-get update && sudo apt-get upgrade -y
+sudo pacman -Syu --noconfirm
 
 # Install required packages
 print_status "Installing required packages..."
-sudo apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
+sudo pacman -S --noconfirm \
     curl \
-    gnupg \
-    lsb-release \
-    software-properties-common \
     wget \
     git \
     vim \
     htop \
-    net-tools
+    net-tools \
+    iptables \
+    iproute2
 
 # Install Docker
 print_status "Installing Docker..."
 if ! command -v docker &> /dev/null; then
-    # Add Docker's official GPG key
-    sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo pacman -S --noconfirm docker docker-compose
     
-    # Add Docker repository
-    echo \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-        $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    
-    # Install Docker
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # Enable and start Docker
+    sudo systemctl enable docker
+    sudo systemctl start docker
     
     # Add current user to docker group
     sudo usermod -aG docker $USER
     
     print_success "Docker installed successfully"
+    print_warning "Please log out and back in for docker group changes to take effect"
 else
     print_warning "Docker is already installed"
 fi
@@ -103,21 +93,35 @@ else
     print_success "kubectl is already installed"
 fi
 
-# Install kubeadm, kubelet, and kubectl
+# Install kubeadm and kubelet
 print_status "Installing Kubernetes components..."
 if ! command -v kubeadm &> /dev/null; then
-    # Add Kubernetes repository
-    curl -sS https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/kubernetes-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+    # Download kubeadm and kubelet
+    curl -LO "https://dl.k8s.io/release/v${KUBERNETES_VERSION}.0/bin/linux/amd64/kubeadm"
+    curl -LO "https://dl.k8s.io/release/v${KUBERNETES_VERSION}.0/bin/linux/amd64/kubelet"
     
-    # Install Kubernetes components
-    sudo apt-get update
-    sudo apt-get install -y kubelet kubeadm kubectl
-    sudo apt-mark hold kubelet kubeadm kubectl
+    sudo install -o root -g root -m 0755 kubeadm /usr/local/bin/kubeadm
+    sudo install -o root -g root -m 0755 kubelet /usr/local/bin/kubelet
+    
+    rm kubeadm kubelet
     
     print_success "Kubernetes components installed successfully"
 else
     print_success "Kubernetes components are already installed"
+fi
+
+# Install containerd
+print_status "Installing containerd..."
+if ! command -v containerd &> /dev/null; then
+    sudo pacman -S --noconfirm containerd
+    
+    # Enable and start containerd
+    sudo systemctl enable containerd
+    sudo systemctl start containerd
+    
+    print_success "containerd installed successfully"
+else
+    print_warning "containerd is already installed"
 fi
 
 # Configure system for Kubernetes
@@ -160,7 +164,6 @@ version = 2
 EOF
 
 sudo systemctl restart containerd
-sudo systemctl enable containerd
 
 # Initialize Kubernetes cluster
 print_status "Initializing Kubernetes cluster..."
@@ -169,7 +172,7 @@ if ! kubectl cluster-info &> /dev/null; then
     sudo kubeadm init \
         --pod-network-cidr=10.244.0.0/16 \
         --cri-socket=unix:///var/run/containerd/containerd.sock \
-        --kubernetes-version=v${KUBERNETES_VERSION}
+        --kubernetes-version=v${KUBERNETES_VERSION}.0
     
     # Configure kubectl for current user
     mkdir -p $HOME/.kube
