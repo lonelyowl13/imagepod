@@ -11,7 +11,6 @@ pydantic[email]==2.5.0
 pydantic-settings==2.1.0
 httpx==0.25.2
 celery==5.3.4
-stripe==7.8.0
 boto3==1.34.0
 docker==6.1.3
 kubernetes==28.1.0

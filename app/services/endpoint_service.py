@@ -5,7 +5,6 @@ from app.models.endpoint import Endpoint, EndpointDeployment
 from app.models.job import Job
 from app.schemas.endpoint import EndpointCreate, EndpointUpdate, EndpointJobRequest
 from app.services.job_service import JobService
-from app.services.billing_service import BillingService
 import uuid
 import docker
 import kubernetes
@@ -23,7 +22,6 @@ class EndpointService:
     def __init__(self, db: Session):
         self.db = db
         self.job_service = JobService(db)
-        self.billing_service = BillingService(db)
         self.docker_client = None
         self.k8s_client = None
         self.encryption_key = settings.secret_key.encode()[:32].ljust(32, b'0')
@@ -83,7 +81,6 @@ class EndpointService:
             auto_scaling=endpoint_data.auto_scaling,
             scale_up_threshold=endpoint_data.scale_up_threshold,
             scale_down_threshold=endpoint_data.scale_down_threshold,
-            base_price_per_second=endpoint_data.base_price_per_second,
             deployment_type=endpoint_data.deployment_type,
             deployment_config=endpoint_data.deployment_config,
             is_public=endpoint_data.is_public,
@@ -594,7 +591,6 @@ class EndpointService:
             "output": job.output_data,
             "error": job.error_message,
             "executionTime": job.duration_seconds,
-            "cost": job.cost,
             "createdAt": job.created_at.isoformat() if job.created_at else None,
             "startedAt": job.started_at.isoformat() if job.started_at else None,
             "completedAt": job.completed_at.isoformat() if job.completed_at else None,

@@ -24,7 +24,6 @@ class EndpointBase(BaseModel):
     auto_scaling: bool = True
     scale_up_threshold: float = 0.8
     scale_down_threshold: float = 0.2
-    base_price_per_second: float = 0.0
     deployment_type: str = "kubernetes"
     deployment_config: Optional[Dict[str, Any]] = None
     is_public: bool = False
@@ -56,7 +55,6 @@ class EndpointUpdate(BaseModel):
     auto_scaling: Optional[bool] = None
     scale_up_threshold: Optional[float] = None
     scale_down_threshold: Optional[float] = None
-    base_price_per_second: Optional[float] = None
     deployment_type: Optional[str] = None
     deployment_config: Optional[Dict[str, Any]] = None
     is_public: Optional[bool] = None
@@ -121,7 +119,6 @@ class EndpointJobResponse(BaseModel):
     output: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     executionTime: Optional[float] = None
-    cost: float
     createdAt: str
     startedAt: Optional[str] = None
     completedAt: Optional[str] = None

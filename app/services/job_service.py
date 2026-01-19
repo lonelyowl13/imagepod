@@ -5,7 +5,6 @@ from app.models.job import Job, JobTemplate
 from app.models.worker import Worker, WorkerPool
 from app.schemas.job import JobCreate, JobUpdate, JobTemplateCreate, JobStatusUpdate
 from app.services.worker_service import WorkerService
-from app.services.billing_service import BillingService
 import json
 import uuid
 from datetime import datetime
@@ -15,7 +14,6 @@ class JobService:
     def __init__(self, db: Session):
         self.db = db
         self.worker_service = WorkerService(db)
-        self.billing_service = BillingService(db)
 
     def create_job(self, user_id: int, job_data: JobCreate) -> Job:
         # Validate template if provided
@@ -118,10 +116,6 @@ class JobService:
         if status_update.duration_seconds is not None:
             job.duration_seconds = status_update.duration_seconds
 
-        # Calculate cost if job is completed
-        if job.status == "completed" and job.duration_seconds:
-            job.cost = self._calculate_job_cost(job)
-
         self.db.commit()
         self.db.refresh(job)
         return job
@@ -195,33 +189,6 @@ class JobService:
         
         return False
 
-    def _calculate_job_cost(self, job: Job) -> float:
-        """Calculate the cost of a completed job"""
-        if not job.duration_seconds or not job.template:
-            return 0.0
-
-        # Base cost from template
-        base_cost = job.template.base_price_per_second * job.duration_seconds
-
-        # Add resource costs
-        resource_cost = 0.0
-        if job.gpu_memory_used:
-            # GPU memory cost (example: $0.01 per GB-second)
-            gpu_cost = (job.gpu_memory_used / 1024) * job.duration_seconds * 0.01
-            resource_cost += gpu_cost
-
-        if job.cpu_cores_used:
-            # CPU cost (example: $0.001 per core-second)
-            cpu_cost = job.cpu_cores_used * job.duration_seconds * 0.001
-            resource_cost += cpu_cost
-
-        if job.ram_used:
-            # RAM cost (example: $0.0001 per MB-second)
-            ram_cost = job.ram_used * job.duration_seconds * 0.0001
-            resource_cost += ram_cost
-
-        return base_cost + resource_cost
-
     def get_runpod_compatible_response(self, job: Job) -> Dict[str, Any]:
         """Convert job to RunPod serverless compatible response format"""
         return {
@@ -231,7 +198,6 @@ class JobService:
             "output": job.output_data,
             "error": job.error_message,
             "executionTime": job.duration_seconds,
-            "cost": job.cost,
             "createdAt": job.created_at.isoformat() if job.created_at else None,
             "startedAt": job.started_at.isoformat() if job.started_at else None,
             "completedAt": job.completed_at.isoformat() if job.completed_at else None,

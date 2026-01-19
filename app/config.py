@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
-    # API Keys
-    stripe_secret_key: Optional[str] = None
-    stripe_publishable_key: Optional[str] = None
-    
     # AWS
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None

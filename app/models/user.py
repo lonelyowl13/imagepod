@@ -28,16 +28,11 @@ class User(Base):
     avatar_url = Column(String)
     bio = Column(Text)
     
-    # Billing
-    stripe_customer_id = Column(String)
-    billing_email = Column(String)
-    
     # Settings
     notification_preferences = Column(Text)  # JSON string
     default_worker_config = Column(Text)  # JSON string
     
     # Relationships
     jobs = relationship("Job", back_populates="user")
-    billing_accounts = relationship("BillingAccount", back_populates="user")
     created_templates = relationship("JobTemplate", back_populates="creator")
     endpoints = relationship("Endpoint", back_populates="user")

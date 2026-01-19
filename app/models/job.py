@@ -26,9 +26,6 @@ class JobTemplate(Base):
     min_ram = Column(Integer)  # MB
     max_ram = Column(Integer)  # MB
     
-    # Pricing
-    base_price_per_second = Column(Float, default=0.0)
-    
     # Metadata
     is_public = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
@@ -76,10 +73,6 @@ class Job(Base):
     completed_at = Column(DateTime(timezone=True))
     duration_seconds = Column(Float)
     
-    # Billing
-    cost = Column(Float, default=0.0)
-    billing_account_id = Column(Integer, ForeignKey("billing_accounts.id"))
-    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -89,5 +82,4 @@ class Job(Base):
     template = relationship("JobTemplate", back_populates="jobs")
     worker = relationship("Worker", back_populates="jobs")
     worker_pool = relationship("WorkerPool", back_populates="jobs")
-    billing_account = relationship("BillingAccount", back_populates="jobs")
     endpoint = relationship("Endpoint", back_populates="jobs")

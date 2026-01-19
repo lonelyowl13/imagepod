@@ -43,9 +43,6 @@ class Endpoint(Base):
     scale_up_threshold = Column(Float, default=0.8)
     scale_down_threshold = Column(Float, default=0.2)
     
-    # Pricing
-    base_price_per_second = Column(Float, default=0.0)
-    
     # Status and health
     status = Column(String, default="pending")  # pending, active, inactive, error
     health_status = Column(String, default="unknown")  # healthy, unhealthy, unknown

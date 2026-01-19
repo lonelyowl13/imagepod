@@ -17,7 +17,6 @@ class JobTemplateBase(BaseModel):
     max_cpu_cores: Optional[int] = None
     min_ram: Optional[int] = None
     max_ram: Optional[int] = None
-    base_price_per_second: float = 0.0
     is_public: bool = False
 
 
@@ -67,8 +66,6 @@ class JobResponse(JobBase):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
-    cost: float
-    billing_account_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

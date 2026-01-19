@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from app.config import settings
 from app.database import engine, Base
-from app.api import auth, jobs, billing, workers, endpoints, custom_endpoints, gpu_workers
+from app.api import auth, jobs, workers, endpoints, custom_endpoints
 from app.services.worker_service import WorkerService
 from app.database import get_db
 from sqlalchemy.orm import Session
@@ -59,10 +59,8 @@ if not settings.debug:
 # Include API routers
 app.include_router(auth.router)
 app.include_router(jobs.router)
-app.include_router(billing.router)
 app.include_router(workers.router)
 app.include_router(endpoints.router)
-app.include_router(gpu_workers.router)
 
 # Include custom endpoint router (for dynamic routing)
 app.include_router(custom_endpoints.custom_endpoint_router)

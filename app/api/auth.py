@@ -5,9 +5,7 @@ from datetime import timedelta
 from app.database import get_db
 from app.auth import authenticate_user, create_access_token, get_current_active_user
 from app.schemas.user import UserLogin, UserCreate, UserResponse, Token
-from app.schemas.billing import BillingAccountCreate
 from app.services.user_service import UserService
-from app.services.billing_service import BillingService
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -18,20 +16,10 @@ security = HTTPBearer()
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user"""
     user_service = UserService(db)
-    billing_service = BillingService(db)
     
     try:
         # Create user
         user = user_service.create_user(user_data)
-        
-        # Create default billing account
-        billing_account_data = BillingAccountCreate(
-            name="Default Account",
-            billing_email=user.email,
-            is_primary=True
-        )
-        billing_service.create_billing_account(user.id, billing_account_data)
-        
         return user
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
