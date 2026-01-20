@@ -1,13 +1,12 @@
-version: '3.8'
-
 services:
+
   # PostgreSQL Database
   postgres:
     image: postgres:15
     environment:
       POSTGRES_DB: imagepod
       POSTGRES_USER: imagepod
-      POSTGRES_PASSWORD: imagepod_password
+      POSTGRES_PASSWORD: Kkc7HGNjxEbkBUN0OK2SrA
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -21,6 +20,9 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: "tD0Fe7OiuEZDszXx_GrFLA"
+    command: ["redis-server", "--requirepass", "tD0Fe7OiuEZDszXx_GrFLA"]
     ports:
       - "6379:6379"
     volumes:
@@ -31,57 +33,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ImagePod Backend API
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://imagepod:imagepod_password@postgres:5432/imagepod
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ENVIRONMENT=development
-      - DEBUG=true
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./app:/app/app
-    restart: unless-stopped
-
-  # Prometheus (for metrics)
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-
-  # Grafana (for monitoring dashboards)
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   redis_data:
-  prometheus_data:
-  grafana_data:

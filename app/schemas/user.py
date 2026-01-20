@@ -20,7 +20,6 @@ class UserUpdate(BaseModel):
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
     notification_preferences: Optional[dict] = None
-    default_worker_config: Optional[dict] = None
 
 
 class UserLogin(BaseModel):

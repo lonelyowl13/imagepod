@@ -157,14 +157,14 @@ async def get_job_template(
     return template
 
 
-# Admin endpoints for job status updates (used by workers)
+# Endpoint for job status updates (used by external workers or endpoint deployments)
 @router.put("/{job_id}/status")
 async def update_job_status(
     job_id: int,
     status_update: JobStatusUpdate,
     db: Session = Depends(get_db)
 ):
-    """Update job status (used by workers)"""
+    """Update job status"""
     job_service = JobService(db)
     job = job_service.update_job_status(job_id, status_update)
     

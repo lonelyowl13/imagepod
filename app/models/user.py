@@ -30,7 +30,6 @@ class User(Base):
     
     # Settings
     notification_preferences = Column(Text)  # JSON string
-    default_worker_config = Column(Text)  # JSON string
     
     # Relationships
     jobs = relationship("Job", back_populates="user")

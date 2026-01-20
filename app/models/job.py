@@ -58,9 +58,7 @@ class Job(Base):
     output_data = Column(JSON)
     error_message = Column(Text)
     
-    # Worker assignment
-    worker_id = Column(Integer, ForeignKey("workers.id"))
-    worker_pool_id = Column(Integer, ForeignKey("worker_pools.id"))
+    # Endpoint assignment
     endpoint_id = Column(Integer, ForeignKey("endpoints.id"))
     
     # Resource usage
@@ -80,6 +78,4 @@ class Job(Base):
     # Relationships
     user = relationship("User", back_populates="jobs")
     template = relationship("JobTemplate", back_populates="jobs")
-    worker = relationship("Worker", back_populates="jobs")
-    worker_pool = relationship("WorkerPool", back_populates="jobs")
     endpoint = relationship("Endpoint", back_populates="jobs")

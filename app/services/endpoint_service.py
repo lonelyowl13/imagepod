@@ -6,9 +6,6 @@ from app.models.job import Job
 from app.schemas.endpoint import EndpointCreate, EndpointUpdate, EndpointJobRequest
 from app.services.job_service import JobService
 import uuid
-import docker
-import kubernetes
-from kubernetes import client, config
 from app.config import settings
 from datetime import datetime, timedelta
 import asyncio
@@ -22,26 +19,8 @@ class EndpointService:
     def __init__(self, db: Session):
         self.db = db
         self.job_service = JobService(db)
-        self.docker_client = None
-        self.k8s_client = None
         self.encryption_key = settings.secret_key.encode()[:32].ljust(32, b'0')
         self.cipher = Fernet(base64.urlsafe_b64encode(self.encryption_key))
-        
-        # Initialize Docker client
-        try:
-            self.docker_client = docker.from_env()
-        except Exception as e:
-            print(f"Failed to initialize Docker client: {e}")
-        
-        # Initialize Kubernetes client
-        try:
-            if settings.kubeconfig_path:
-                config.load_kube_config(config_file=settings.kubeconfig_path)
-            else:
-                config.load_incluster_config()
-            self.k8s_client = client.ApiClient()
-        except Exception as e:
-            print(f"Failed to initialize Kubernetes client: {e}")
 
     def create_endpoint(self, user_id: int, endpoint_data: EndpointCreate) -> Endpoint:
         """Create a new endpoint"""
@@ -93,7 +72,8 @@ class EndpointService:
         self.db.commit()
         self.db.refresh(db_endpoint)
 
-        # Deploy the endpoint
+        # Mark the endpoint as logically "deployed" – actual execution is handled by workers,
+        # this backend only stores configuration and status.
         self._deploy_endpoint(db_endpoint)
 
         return db_endpoint
@@ -148,10 +128,9 @@ class EndpointService:
         self.db.commit()
         self.db.refresh(endpoint)
 
-        # Redeploy if necessary
+        # Redeploy if necessary (logical only – no infra clients)
         if any(field in update_data for field in ['docker_image', 'docker_tag', 'deployment_config']):
             self._deploy_endpoint(endpoint)
-
         return endpoint
 
     def delete_endpoint(self, endpoint_id: int, user_id: Optional[int] = None) -> bool:
@@ -195,7 +174,6 @@ class EndpointService:
         # Route to endpoint deployment
         deployment = self._get_available_deployment(endpoint)
         if deployment:
-            job.worker_id = deployment.id  # Use deployment as worker
             job.status = "running"
             job.started_at = datetime.utcnow()
             self.db.commit()
@@ -296,228 +274,36 @@ class EndpointService:
             return False
 
     def _deploy_endpoint(self, endpoint: Endpoint):
-        """Deploy an endpoint"""
-        if endpoint.deployment_type == "kubernetes":
-            self._deploy_k8s_endpoint(endpoint)
-        elif endpoint.deployment_type == "docker":
-            self._deploy_docker_endpoint(endpoint)
-        else:
-            # Serverless deployment
-            self._deploy_serverless_endpoint(endpoint)
+        """Logically deploy an endpoint.
 
-    def _deploy_k8s_endpoint(self, endpoint: Endpoint):
-        """Deploy endpoint using Kubernetes"""
-        if not self.k8s_client:
-            endpoint.status = "error"
-            self.db.commit()
-            return
-
-        try:
-            deployment_id = f"endpoint-{endpoint.endpoint_id}-{uuid.uuid4().hex[:8]}"
-            
-            # Create deployment
-            deployment_manifest = {
-                "apiVersion": "apps/v1",
-                "kind": "Deployment",
-                "metadata": {
-                    "name": f"endpoint-{endpoint.endpoint_id}",
-                    "labels": {
-                        "app": "imagepod-endpoint",
-                        "endpoint-id": endpoint.endpoint_id,
-                        "user-id": str(endpoint.user_id)
-                    }
-                },
-                "spec": {
-                    "replicas": endpoint.target_replicas,
-                    "selector": {
-                        "matchLabels": {
-                            "app": "imagepod-endpoint",
-                            "endpoint-id": endpoint.endpoint_id
-                        }
-                    },
-                    "template": {
-                        "metadata": {
-                            "labels": {
-                                "app": "imagepod-endpoint",
-                                "endpoint-id": endpoint.endpoint_id
-                            }
-                        },
-                        "spec": {
-                            "containers": [{
-                                "name": "endpoint",
-                                "image": f"{endpoint.docker_image}:{endpoint.docker_tag}",
-                                "env": [
-                                    {"name": "ENDPOINT_ID", "value": endpoint.endpoint_id},
-                                    {"name": "USER_ID", "value": str(endpoint.user_id)},
-                                    {"name": "API_ENDPOINT", "value": f"http://api:8000"}
-                                ],
-                                "resources": {
-                                    "requests": {
-                                        "memory": f"{endpoint.min_ram or 512}Mi",
-                                        "cpu": str(endpoint.min_cpu_cores or 1)
-                                    },
-                                    "limits": {
-                                        "memory": f"{endpoint.max_ram or 1024}Mi",
-                                        "cpu": str(endpoint.max_cpu_cores or 2)
-                                    }
-                                }
-                            }]
-                        }
-                    }
-                }
-            }
-
-            # Apply deployment
-            apps_v1 = client.AppsV1Api(self.k8s_client)
-            apps_v1.create_namespaced_deployment(
-                namespace="default",
-                body=deployment_manifest
-            )
-
-            # Create service
-            service_manifest = {
-                "apiVersion": "v1",
-                "kind": "Service",
-                "metadata": {
-                    "name": f"endpoint-{endpoint.endpoint_id}",
-                    "labels": {
-                        "app": "imagepod-endpoint",
-                        "endpoint-id": endpoint.endpoint_id
-                    }
-                },
-                "spec": {
-                    "selector": {
-                        "app": "imagepod-endpoint",
-                        "endpoint-id": endpoint.endpoint_id
-                    },
-                    "ports": [{
-                        "port": 8000,
-                        "targetPort": 8000
-                    }]
-                }
-            }
-
-            core_v1 = client.CoreV1Api(self.k8s_client)
-            core_v1.create_namespaced_service(
-                namespace="default",
-                body=service_manifest
-            )
-
-            # Create deployment record
-            deployment = EndpointDeployment(
-                endpoint_id=endpoint.id,
-                deployment_id=deployment_id,
-                status="active",
-                health_status="healthy"
-            )
-            self.db.add(deployment)
-
-            endpoint.status = "active"
-            endpoint.deployed_at = datetime.utcnow()
-            endpoint.current_replicas = endpoint.target_replicas
-
-        except Exception as e:
-            print(f"Failed to deploy K8s endpoint: {e}")
-            endpoint.status = "error"
-
-        self.db.commit()
-
-    def _deploy_docker_endpoint(self, endpoint: Endpoint):
-        """Deploy endpoint using Docker"""
-        if not self.docker_client:
-            endpoint.status = "error"
-            self.db.commit()
-            return
-
-        try:
-            deployment_id = f"endpoint-{endpoint.endpoint_id}-{uuid.uuid4().hex[:8]}"
-            
-            # Create container
-            container = self.docker_client.containers.run(
-                image=f"{endpoint.docker_image}:{endpoint.docker_tag}",
-                name=f"endpoint-{endpoint.endpoint_id}",
-                environment={
-                    "ENDPOINT_ID": endpoint.endpoint_id,
-                    "USER_ID": str(endpoint.user_id),
-                    "API_ENDPOINT": "http://api:8000"
-                },
-                detach=True,
-                remove=True
-            )
-
-            # Create deployment record
-            deployment = EndpointDeployment(
-                endpoint_id=endpoint.id,
-                deployment_id=deployment_id,
-                container_id=container.id,
-                status="active",
-                health_status="healthy"
-            )
-            self.db.add(deployment)
-
-            endpoint.status = "active"
-            endpoint.deployed_at = datetime.utcnow()
-            endpoint.current_replicas = 1
-
-        except Exception as e:
-            print(f"Failed to deploy Docker endpoint: {e}")
-            endpoint.status = "error"
-
-        self.db.commit()
-
-    def _deploy_serverless_endpoint(self, endpoint: Endpoint):
-        """Deploy endpoint as serverless function"""
-        # This would integrate with serverless platforms like AWS Lambda, Google Cloud Functions, etc.
+        The main backend does not talk to Docker/Kubernetes directly; it only
+        tracks configuration and status so that external workers/executors
+        can act on this data.
+        """
         endpoint.status = "active"
         endpoint.deployed_at = datetime.utcnow()
-        endpoint.current_replicas = 0  # Serverless scales to zero
+        # Let logical replicas match the target; actual infra scaling is handled elsewhere.
+        endpoint.current_replicas = endpoint.target_replicas or 0
         self.db.commit()
 
     def _terminate_endpoint(self, endpoint: Endpoint):
-        """Terminate all deployments for an endpoint"""
+        """Logically terminate all deployments for an endpoint.
+
+        This updates DB state only; external executors are responsible for
+        reacting to these changes.
+        """
         deployments = self.db.query(EndpointDeployment).filter(
             EndpointDeployment.endpoint_id == endpoint.id,
             EndpointDeployment.status == "active"
         ).all()
 
         for deployment in deployments:
-            if endpoint.deployment_type == "kubernetes":
-                self._terminate_k8s_deployment(endpoint, deployment)
-            elif endpoint.deployment_type == "docker":
-                self._terminate_docker_deployment(deployment)
-
             deployment.status = "terminated"
             deployment.terminated_at = datetime.utcnow()
 
         endpoint.status = "inactive"
         endpoint.current_replicas = 0
         self.db.commit()
-
-    def _terminate_k8s_deployment(self, endpoint: Endpoint, deployment: EndpointDeployment):
-        """Terminate Kubernetes deployment"""
-        try:
-            apps_v1 = client.AppsV1Api(self.k8s_client)
-            apps_v1.delete_namespaced_deployment(
-                name=f"endpoint-{endpoint.endpoint_id}",
-                namespace="default"
-            )
-
-            core_v1 = client.CoreV1Api(self.k8s_client)
-            core_v1.delete_namespaced_service(
-                name=f"endpoint-{endpoint.endpoint_id}",
-                namespace="default"
-            )
-        except Exception as e:
-            print(f"Failed to terminate K8s deployment: {e}")
-
-    def _terminate_docker_deployment(self, deployment: EndpointDeployment):
-        """Terminate Docker deployment"""
-        try:
-            if deployment.container_id:
-                container = self.docker_client.containers.get(deployment.container_id)
-                container.stop()
-        except Exception as e:
-            print(f"Failed to terminate Docker deployment: {e}")
 
     def _get_available_deployment(self, endpoint: Endpoint) -> Optional[EndpointDeployment]:
         """Get an available deployment for job execution"""
@@ -532,53 +318,11 @@ class EndpointService:
         )
 
     def _scale_endpoint_deployments(self, endpoint: Endpoint, target_replicas: int):
-        """Scale endpoint deployments"""
-        if endpoint.deployment_type == "kubernetes":
-            self._scale_k8s_deployments(endpoint, target_replicas)
-        elif endpoint.deployment_type == "docker":
-            self._scale_docker_deployments(endpoint, target_replicas)
+        """Scale endpoint deployments logically.
 
-    def _scale_k8s_deployments(self, endpoint: Endpoint, target_replicas: int):
-        """Scale Kubernetes deployments"""
-        try:
-            apps_v1 = client.AppsV1Api(self.k8s_client)
-            deployment = apps_v1.read_namespaced_deployment(
-                name=f"endpoint-{endpoint.endpoint_id}",
-                namespace="default"
-            )
-            deployment.spec.replicas = target_replicas
-            apps_v1.patch_namespaced_deployment(
-                name=f"endpoint-{endpoint.endpoint_id}",
-                namespace="default",
-                body=deployment
-            )
-            endpoint.current_replicas = target_replicas
-        except Exception as e:
-            print(f"Failed to scale K8s deployment: {e}")
-
-    def _scale_docker_deployments(self, endpoint: Endpoint, target_replicas: int):
-        """Scale Docker deployments"""
-        current_deployments = self.db.query(EndpointDeployment).filter(
-            EndpointDeployment.endpoint_id == endpoint.id,
-            EndpointDeployment.status == "active"
-        ).count()
-
-        if target_replicas > current_deployments:
-            # Scale up
-            for _ in range(target_replicas - current_deployments):
-                self._deploy_docker_endpoint(endpoint)
-        elif target_replicas < current_deployments:
-            # Scale down
-            deployments_to_terminate = self.db.query(EndpointDeployment).filter(
-                EndpointDeployment.endpoint_id == endpoint.id,
-                EndpointDeployment.status == "active"
-            ).limit(current_deployments - target_replicas).all()
-
-            for deployment in deployments_to_terminate:
-                self._terminate_docker_deployment(deployment)
-                deployment.status = "terminated"
-                deployment.terminated_at = datetime.utcnow()
-
+        No direct Docker/Kubernetes scaling is performed here; we only update
+        the desired replica count so that external systems can react.
+        """
         endpoint.current_replicas = target_replicas
         self.db.commit()
 

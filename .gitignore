@@ -207,6 +207,9 @@ temp/
 ehthumbs.db
 Thumbs.db
 
+# random shit storage
+random_shit/
+
 # IDE files
 .idea/
 *.swp

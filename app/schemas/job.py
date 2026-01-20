@@ -58,8 +58,6 @@ class JobResponse(JobBase):
     status: str
     output_data: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    worker_id: Optional[int] = None
-    worker_pool_id: Optional[int] = None
     gpu_memory_used: Optional[int] = None
     cpu_cores_used: Optional[int] = None
     ram_used: Optional[int] = None

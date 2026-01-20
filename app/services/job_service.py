@@ -2,9 +2,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.models.job import Job, JobTemplate
-from app.models.worker import Worker, WorkerPool
 from app.schemas.job import JobCreate, JobUpdate, JobTemplateCreate, JobStatusUpdate
-from app.services.worker_service import WorkerService
 import json
 import uuid
 from datetime import datetime
@@ -13,7 +11,6 @@ from datetime import datetime
 class JobService:
     def __init__(self, db: Session):
         self.db = db
-        self.worker_service = WorkerService(db)
 
     def create_job(self, user_id: int, job_data: JobCreate) -> Job:
         # Validate template if provided
@@ -38,9 +35,6 @@ class JobService:
         self.db.add(db_job)
         self.db.commit()
         self.db.refresh(db_job)
-
-        # Try to assign worker
-        self._assign_worker(db_job)
 
         return db_job
 
@@ -169,25 +163,6 @@ class JobService:
             .limit(limit)
             .all()
         )
-
-    def _assign_worker(self, job: Job) -> bool:
-        """Assign an available worker to the job"""
-        # Find available worker based on job requirements
-        available_worker = self.worker_service.find_available_worker(job)
-        
-        if available_worker:
-            job.worker_id = available_worker.id
-            job.worker_pool_id = available_worker.pool_id
-            job.status = "running"
-            job.started_at = datetime.utcnow()
-            
-            # Update worker status
-            available_worker.status = "running"
-            
-            self.db.commit()
-            return True
-        
-        return False
 
     def get_runpod_compatible_response(self, job: Job) -> Dict[str, Any]:
         """Convert job to RunPod serverless compatible response format"""
