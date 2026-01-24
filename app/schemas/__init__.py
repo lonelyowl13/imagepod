@@ -5,11 +5,13 @@ from .endpoint import (
     EndpointJobRequest, EndpointJobResponse, EndpointStatsResponse, 
     DockerImageUpload, EndpointScaleRequest
 )
+from .template import TemplateCreate, TemplateUpdate, TemplateResponse
 
 __all__ = [
     "UserCreate", "UserUpdate", "UserResponse", "UserLogin",
     "JobCreate", "JobUpdate", "JobResponse", "JobTemplateCreate", "JobTemplateResponse",
     "EndpointCreate", "EndpointUpdate", "EndpointResponse", "EndpointDeploymentResponse",
     "EndpointJobRequest", "EndpointJobResponse", "EndpointStatsResponse", 
-    "DockerImageUpload", "EndpointScaleRequest"
+    "DockerImageUpload", "EndpointScaleRequest",
+    "TemplateCreate", "TemplateUpdate", "TemplateResponse"
 ]
