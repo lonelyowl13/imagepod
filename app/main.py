@@ -83,29 +83,6 @@ async def health_check():
     }
 
 
-@app.get("/metrics")
-async def metrics():
-    """Basic metrics endpoint (for Prometheus)"""
-    # In production, you'd want to use prometheus_client
-    return {
-        "status": "ok",
-        "message": "Metrics endpoint - implement with prometheus_client"
-    }
-
-
-# RunPod serverless compatibility endpoints
-@app.post("/runsync")
-async def run_sync():
-    """RunPod serverless sync endpoint compatibility"""
-    return {"message": "Use /jobs/ endpoint for job creation"}
-
-
-@app.post("/run")
-async def run_async():
-    """RunPod serverless async endpoint compatibility"""
-    return {"message": "Use /jobs/ endpoint for job creation"}
-
-
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
