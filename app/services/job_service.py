@@ -1,9 +1,8 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from app.models.job import Job, JobTemplate
-from app.schemas.job import JobCreate, JobUpdate, JobTemplateCreate, JobStatusUpdate
-import json
+from app.models.job import Job
+from app.models.endpoint import Endpoint
+from app.schemas.job import JobStatusUpdate
 import uuid
 from datetime import datetime
 
@@ -12,24 +11,26 @@ class JobService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_job(self, user_id: int, job_data: JobCreate) -> Job:
-        # Validate template if provided
-        template = None
-        if job_data.template_id:
-            template = self.get_template(job_data.template_id)
-            if not template:
-                raise ValueError("Template not found")
-            if not template.is_active:
-                raise ValueError("Template is not active")
-
+    def create_job_for_endpoint(self, endpoint_id: str, user_id: int, input_data: Dict[str, Any]) -> Job:
+        """Create a job for a specific endpoint"""
+        # Get endpoint by endpoint_id (string)
+        endpoint = self.db.query(Endpoint).filter(Endpoint.endpoint_id == endpoint_id).first()
+        if not endpoint:
+            raise ValueError("Endpoint not found")
+        
+        # Verify user owns the endpoint
+        if endpoint.user_id != user_id:
+            raise ValueError("Endpoint not found")  # Don't reveal it exists but belongs to another user
+        
         # Create job
         db_job = Job(
+            id=uuid.uuid4(),
             user_id=user_id,
-            template_id=job_data.template_id,
-            name=job_data.name,
-            description=job_data.description,
-            input_data=job_data.input_data,
-            status="pending"
+            endpoint_id=endpoint.id,  # Use internal integer ID
+            input_data=input_data,
+            status="IN_QUEUE",
+            delay_time=0,
+            execution_time=0
         )
 
         self.db.add(db_job)
@@ -38,45 +39,55 @@ class JobService:
 
         return db_job
 
-    def get_job(self, job_id: int, user_id: Optional[int] = None) -> Optional[Job]:
-        query = self.db.query(Job).filter(Job.id == job_id)
+    def get_job(self, job_id: str, user_id: Optional[int] = None) -> Optional[Job]:
+        """Get job by UUID (string)"""
+        try:
+            job_uuid = uuid.UUID(job_id)
+        except ValueError:
+            return None
+        
+        query = self.db.query(Job).filter(Job.id == job_uuid)
         if user_id:
             query = query.filter(Job.user_id == user_id)
         return query.first()
 
-    def get_user_jobs(self, user_id: int, skip: int = 0, limit: int = 100) -> List[Job]:
-        return (
-            self.db.query(Job)
-            .filter(Job.user_id == user_id)
-            .order_by(desc(Job.created_at))
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+    def get_job_by_endpoint(self, endpoint_id: str, job_id: str, user_id: Optional[int] = None) -> Optional[Job]:
+        """Get job by endpoint_id and job_id"""
+        # Get endpoint by endpoint_id (string)
+        endpoint = self.db.query(Endpoint).filter(Endpoint.endpoint_id == endpoint_id).first()
+        if not endpoint:
+            return None
+        
+        # Verify user owns the endpoint if user_id provided
+        if user_id and endpoint.user_id != user_id:
+            return None
+        
+        job = self.get_job(job_id, user_id)
+        if not job or job.endpoint_id != endpoint.id:
+            return None
+        
+        return job
 
-    def get_all_jobs(self, skip: int = 0, limit: int = 100) -> List[Job]:
-        return (
-            self.db.query(Job)
-            .order_by(desc(Job.created_at))
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
-
-    def update_job(self, job_id: int, job_update: JobUpdate, user_id: Optional[int] = None) -> Optional[Job]:
+    def cancel_job(self, job_id: str, user_id: Optional[int] = None) -> Optional[Job]:
+        """Cancel a job"""
         job = self.get_job(job_id, user_id)
         if not job:
             return None
-
-        update_data = job_update.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(job, field, value)
-
-        self.db.commit()
-        self.db.refresh(job)
+        
+        # Only cancel if job is still queued or running
+        if job.status in ["IN_QUEUE", "RUNNING"]:
+            job.status = "CANCELLED"
+            job.completed_at = datetime.utcnow()
+            if job.started_at:
+                job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
+            
+            self.db.commit()
+            self.db.refresh(job)
+        
         return job
 
-    def update_job_status(self, job_id: int, status_update: JobStatusUpdate) -> Optional[Job]:
+    def update_job_status(self, job_id: str, status_update: JobStatusUpdate) -> Optional[Job]:
+        """Update job status (used by external workers)"""
         job = self.get_job(job_id)
         if not job:
             return None
@@ -85,9 +96,9 @@ class JobService:
         if status_update.status:
             job.status = status_update.status
             
-            if status_update.status == "running" and not job.started_at:
+            if status_update.status == "RUNNING" and not job.started_at:
                 job.started_at = datetime.utcnow()
-            elif status_update.status in ["completed", "failed", "cancelled"] and not job.completed_at:
+            elif status_update.status in ["COMPLETED", "FAILED", "CANCELLED"] and not job.completed_at:
                 job.completed_at = datetime.utcnow()
                 if job.started_at:
                     job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
@@ -109,71 +120,8 @@ class JobService:
 
         if status_update.duration_seconds is not None:
             job.duration_seconds = status_update.duration_seconds
+            job.execution_time = int(status_update.duration_seconds * 1000)  # Convert to milliseconds
 
         self.db.commit()
         self.db.refresh(job)
         return job
-
-    def delete_job(self, job_id: int, user_id: Optional[int] = None) -> bool:
-        job = self.get_job(job_id, user_id)
-        if not job:
-            return False
-
-        # Cancel job if it's still running
-        if job.status in ["pending", "running"]:
-            job.status = "cancelled"
-            job.completed_at = datetime.utcnow()
-            if job.started_at:
-                job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
-
-        self.db.delete(job)
-        self.db.commit()
-        return True
-
-    def create_template(self, user_id: int, template_data: JobTemplateCreate) -> JobTemplate:
-        db_template = JobTemplate(
-            created_by=user_id,
-            **template_data.dict()
-        )
-
-        self.db.add(db_template)
-        self.db.commit()
-        self.db.refresh(db_template)
-        return db_template
-
-    def get_template(self, template_id: int) -> Optional[JobTemplate]:
-        return self.db.query(JobTemplate).filter(JobTemplate.id == template_id).first()
-
-    def get_public_templates(self, skip: int = 0, limit: int = 100) -> List[JobTemplate]:
-        return (
-            self.db.query(JobTemplate)
-            .filter(JobTemplate.is_public == True, JobTemplate.is_active == True)
-            .order_by(desc(JobTemplate.created_at))
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
-
-    def get_user_templates(self, user_id: int, skip: int = 0, limit: int = 100) -> List[JobTemplate]:
-        return (
-            self.db.query(JobTemplate)
-            .filter(JobTemplate.created_by == user_id)
-            .order_by(desc(JobTemplate.created_at))
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
-
-    def get_runpod_compatible_response(self, job: Job) -> Dict[str, Any]:
-        """Convert job to RunPod serverless compatible response format"""
-        return {
-            "id": str(job.id),
-            "status": job.status,
-            "input": job.input_data,
-            "output": job.output_data,
-            "error": job.error_message,
-            "executionTime": job.duration_seconds,
-            "createdAt": job.created_at.isoformat() if job.created_at else None,
-            "startedAt": job.started_at.isoformat() if job.started_at else None,
-            "completedAt": job.completed_at.isoformat() if job.completed_at else None,
-        }

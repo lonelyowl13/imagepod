@@ -1,7 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
+import uuid
 
 
 class JobTemplate(Base):
@@ -42,7 +44,7 @@ class JobTemplate(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     template_id = Column(Integer, ForeignKey("job_templates.id"))
     
@@ -50,12 +52,18 @@ class Job(Base):
     name = Column(String)
     description = Column(Text)
     
-    # Job status
-    status = Column(String, default="pending")  # pending, running, completed, failed, cancelled
+    # Job status - using enum values: IN_QUEUE, RUNNING, COMPLETED, FAILED, CANCELLED, TIMED_OUT
+    status = Column(String, default="IN_QUEUE")
     
     # Input/Output
-    input_data = Column(JSON)
-    output_data = Column(JSON)
+    input_data = Column(JSON)  # input
+    output_data = Column(JSON)  # output
+    
+    # Timing fields
+    delay_time = Column(Integer, default=0)  # milliseconds
+    execution_time = Column(Integer, default=0)  # milliseconds
+    
+    # Error message
     error_message = Column(Text)
     
     # Endpoint assignment

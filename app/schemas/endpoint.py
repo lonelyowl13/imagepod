@@ -1,87 +1,75 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
+from app.schemas.template import TemplateResponse
 
 
-class EndpointBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    docker_image: str
-    docker_tag: str = "latest"
-    docker_registry: Optional[str] = None
-    endpoint_config: Optional[Dict[str, Any]] = None
-    input_schema: Optional[Dict[str, Any]] = None
-    output_schema: Optional[Dict[str, Any]] = None
-    min_gpu_memory: Optional[int] = None
-    max_gpu_memory: Optional[int] = None
-    min_cpu_cores: Optional[int] = None
-    max_cpu_cores: Optional[int] = None
-    min_ram: Optional[int] = None
-    max_ram: Optional[int] = None
-    min_replicas: int = 0
-    max_replicas: int = 10
-    target_replicas: int = 1
-    auto_scaling: bool = True
-    scale_up_threshold: float = 0.8
-    scale_down_threshold: float = 0.2
-    deployment_type: str = "kubernetes"
-    deployment_config: Optional[Dict[str, Any]] = None
-    is_public: bool = False
-    api_key_required: bool = True
-    rate_limit: Optional[int] = None
-
-
-class EndpointCreate(EndpointBase):
-    endpoint_id: Optional[str] = None  # If not provided, will be auto-generated
-
-
-class EndpointUpdate(BaseModel):
+class ExecutorResponse(BaseModel):
+    """Minimal executor response for endpoint responses"""
+    id: str  # executor_id
     name: Optional[str] = None
-    description: Optional[str] = None
-    docker_image: Optional[str] = None
-    docker_tag: Optional[str] = None
-    endpoint_config: Optional[Dict[str, Any]] = None
-    input_schema: Optional[Dict[str, Any]] = None
-    output_schema: Optional[Dict[str, Any]] = None
-    min_gpu_memory: Optional[int] = None
-    max_gpu_memory: Optional[int] = None
-    min_cpu_cores: Optional[int] = None
-    max_cpu_cores: Optional[int] = None
-    min_ram: Optional[int] = None
-    max_ram: Optional[int] = None
-    min_replicas: Optional[int] = None
-    max_replicas: Optional[int] = None
-    target_replicas: Optional[int] = None
-    auto_scaling: Optional[bool] = None
-    scale_up_threshold: Optional[float] = None
-    scale_down_threshold: Optional[float] = None
-    deployment_type: Optional[str] = None
-    deployment_config: Optional[Dict[str, Any]] = None
-    is_public: Optional[bool] = None
-    api_key_required: Optional[bool] = None
-    rate_limit: Optional[int] = None
-
-
-class EndpointResponse(EndpointBase):
-    id: int
-    user_id: int
-    endpoint_id: str
-    status: str
-    health_status: str
-    last_health_check: Optional[datetime] = None
-    current_replicas: int
-    total_requests: int
-    successful_requests: int
-    failed_requests: int
-    total_execution_time: float
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    deployed_at: Optional[datetime] = None
+    gpu_type: Optional[str] = None
+    gpu_count: int = 1
+    cuda_version: Optional[str] = None
+    compute_type: str = "GPU"
+    is_active: bool = True
+    is_online: bool = False
 
     class Config:
         from_attributes = True
 
 
+class EndpointCreate(BaseModel):
+    allowedCudaVersions: List[str] = Field(default_factory=list, alias="allowed_cuda_versions")
+    computeType: str = Field("GPU", alias="compute_type")
+    executorId: int = Field(..., alias="executor_id")
+    executionTimeoutMs: int = Field(600000, alias="execution_timeout_ms")
+    idleTimeout: int = Field(5, alias="idle_timeout")
+    name: str
+    templateId: str = Field(..., alias="template_id")
+    vcpuCount: int = Field(2, alias="vcpu_count")
+
+    class Config:
+        populate_by_name = True
+
+
+class EndpointUpdate(BaseModel):
+    allowedCudaVersions: Optional[List[str]] = Field(None, alias="allowed_cuda_versions")
+    computeType: Optional[str] = Field(None, alias="compute_type")
+    executorId: Optional[int] = Field(None, alias="executor_id")
+    executionTimeoutMs: Optional[int] = Field(None, alias="execution_timeout_ms")
+    idleTimeout: Optional[int] = Field(None, alias="idle_timeout")
+    name: Optional[str] = None
+    templateId: Optional[str] = Field(None, alias="template_id")
+    vcpuCount: Optional[int] = Field(None, alias="vcpu_count")
+
+    class Config:
+        populate_by_name = True
+
+
+class EndpointResponse(BaseModel):
+    id: str  # endpoint_id
+    name: str
+    allowedCudaVersions: List[str] = Field(default_factory=list, alias="allowed_cuda_versions")
+    computeType: str = Field(..., alias="compute_type")
+    executorId: str = Field(..., alias="executor_id")  # String representation
+    executionTimeoutMs: int = Field(..., alias="execution_timeout_ms")
+    idleTimeout: int = Field(..., alias="idle_timeout")
+    templateId: str = Field(..., alias="template_id")
+    vcpuCount: int = Field(..., alias="vcpu_count")
+    env: Dict[str, str] = Field(default_factory=dict)
+    version: int = 0
+    createdAt: datetime = Field(..., alias="created_at")
+    template: TemplateResponse
+    executor: ExecutorResponse
+    userId: str = Field(..., alias="user_id")  # String representation
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+# Keep old schemas for backward compatibility (if needed elsewhere)
 class EndpointDeploymentResponse(BaseModel):
     id: int
     endpoint_id: int

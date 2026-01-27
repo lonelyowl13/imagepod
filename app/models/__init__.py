@@ -2,6 +2,7 @@ from .user import User
 from .job import Job, JobTemplate
 from .endpoint import Endpoint, EndpointDeployment
 from .template import Template
+from .executor import Executor
 
 __all__ = [
     "User",
@@ -9,5 +10,6 @@ __all__ = [
     "JobTemplate",
     "Endpoint",
     "EndpointDeployment",
-    "Template"
+    "Template",
+    "Executor"
 ]

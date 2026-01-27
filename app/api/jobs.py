@@ -1,174 +1,87 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
 from app.database import get_db
 from app.auth import get_current_active_user
 from app.models.user import User
-from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobTemplateCreate, JobTemplateResponse, JobStatusUpdate
+from app.schemas.job import JobResponse, JobRunRequest, JobRunResponse
 from app.services.job_service import JobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.post("/", response_model=JobResponse)
-async def create_job(
-    job_data: JobCreate,
+@router.post("/{endpoint_id}/run", response_model=JobRunResponse, status_code=status.HTTP_200_OK)
+async def run_job(
+    endpoint_id: str,
+    job_request: JobRunRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new job"""
+    """Submit a job to an endpoint"""
     job_service = JobService(db)
     
     try:
-        job = job_service.create_job(current_user.id, job_data)
-        return job
+        job = job_service.create_job_for_endpoint(endpoint_id, current_user.id, job_request.input)
+        return JobRunResponse(
+            id=str(job.id),
+            status="IN_QUEUE"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
 
 
-@router.get("/", response_model=List[JobResponse])
-async def get_user_jobs(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+@router.get("/{endpoint_id}/status/{job_id}", response_model=JobResponse)
+async def get_job_status(
+    endpoint_id: str,
+    job_id: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get current user's jobs"""
+    """Get job status"""
     job_service = JobService(db)
-    jobs = job_service.get_user_jobs(current_user.id, skip, limit)
-    return jobs
-
-
-@router.get("/{job_id}", response_model=JobResponse)
-async def get_job(
-    job_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get a specific job"""
-    job_service = JobService(db)
-    job = job_service.get_job(job_id, current_user.id)
+    job = job_service.get_job_by_endpoint(endpoint_id, job_id, current_user.id)
     
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    return job
+    return JobResponse(
+        id=str(job.id),
+        delay_time=job.delay_time,
+        execution_time=job.execution_time,
+        output=job.output_data,
+        input=job.input_data,
+        status=job.status,
+        endpoint_id=job.endpoint_id
+    )
 
 
-@router.put("/{job_id}", response_model=JobResponse)
-async def update_job(
-    job_id: int,
-    job_update: JobUpdate,
+@router.get("/{endpoint_id}/cancel/{job_id}", response_model=JobResponse)
+async def cancel_job(
+    endpoint_id: str,
+    job_id: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Update a job"""
+    """Cancel a job"""
     job_service = JobService(db)
-    job = job_service.update_job(job_id, job_update, current_user.id)
     
+    # Verify endpoint exists and user owns it
+    job = job_service.get_job_by_endpoint(endpoint_id, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    return job
-
-
-@router.delete("/{job_id}")
-async def delete_job(
-    job_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Delete a job"""
-    job_service = JobService(db)
-    success = job_service.delete_job(job_id, current_user.id)
-    
-    if not success:
+    # Cancel the job
+    cancelled_job = job_service.cancel_job(job_id, current_user.id)
+    if not cancelled_job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    return {"message": "Job deleted successfully"}
-
-
-@router.get("/{job_id}/runpod")
-async def get_job_runpod_format(
-    job_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get job in RunPod serverless compatible format"""
-    job_service = JobService(db)
-    job = job_service.get_job(job_id, current_user.id)
-    
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return job_service.get_runpod_compatible_response(job)
-
-
-# Job Templates
-@router.post("/templates/", response_model=JobTemplateResponse)
-async def create_job_template(
-    template_data: JobTemplateCreate,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Create a new job template"""
-    job_service = JobService(db)
-    template = job_service.create_template(current_user.id, template_data)
-    return template
-
-
-@router.get("/templates/", response_model=List[JobTemplateResponse])
-async def get_public_templates(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
-):
-    """Get public job templates"""
-    job_service = JobService(db)
-    templates = job_service.get_public_templates(skip, limit)
-    return templates
-
-
-@router.get("/templates/my/", response_model=List[JobTemplateResponse])
-async def get_user_templates(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get current user's job templates"""
-    job_service = JobService(db)
-    templates = job_service.get_user_templates(current_user.id, skip, limit)
-    return templates
-
-
-@router.get("/templates/{template_id}", response_model=JobTemplateResponse)
-async def get_job_template(
-    template_id: int,
-    db: Session = Depends(get_db)
-):
-    """Get a specific job template"""
-    job_service = JobService(db)
-    template = job_service.get_template(template_id)
-    
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    
-    return template
-
-
-# Endpoint for job status updates (used by external workers or endpoint deployments)
-@router.put("/{job_id}/status")
-async def update_job_status(
-    job_id: int,
-    status_update: JobStatusUpdate,
-    db: Session = Depends(get_db)
-):
-    """Update job status"""
-    job_service = JobService(db)
-    job = job_service.update_job_status(job_id, status_update)
-    
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return job
+    return JobResponse(
+        id=str(cancelled_job.id),
+        delay_time=cancelled_job.delay_time,
+        execution_time=cancelled_job.execution_time,
+        output=cancelled_job.output_data,
+        input=cancelled_job.input_data,
+        status=cancelled_job.status,
+        endpoint_id=cancelled_job.endpoint_id
+    )

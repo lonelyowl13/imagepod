@@ -1,58 +1,107 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 from app.database import get_db
-from app.auth import get_current_active_user, get_current_superuser
+from app.auth import get_current_active_user
 from app.models.user import User
 from app.schemas.endpoint import (
-    EndpointCreate, EndpointUpdate, EndpointResponse, EndpointDeploymentResponse,
-    EndpointJobRequest, EndpointJobResponse, EndpointStatsResponse, 
-    DockerImageUpload, EndpointScaleRequest
+    EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 )
+from app.schemas.template import TemplateResponse
 from app.services.endpoint_service import EndpointService
 
 router = APIRouter(prefix="/endpoints", tags=["endpoints"])
 
 
-@router.post("/", response_model=EndpointResponse)
+def _format_template_response(template) -> TemplateResponse:
+    """Format template for endpoint response"""
+    from app.schemas.template import TemplateResponse
+    return TemplateResponse(
+        id=template.template_id,
+        name=template.name,
+        image_name=template.image_name,
+        category=template.category,
+        container_disk_in_gb=template.container_disk_in_gb,
+        container_registry_auth_id=template.container_registry_auth_id,
+        docker_entrypoint=template.docker_entrypoint or [],
+        docker_start_cmd=template.docker_start_cmd or [],
+        env=template.env or {},
+        ports=template.ports or [],
+        readme=template.readme or "",
+        volume_in_gb=template.volume_in_gb,
+        volume_mount_path=template.volume_mount_path,
+        is_public=template.is_public,
+        is_serverless=template.is_serverless,
+        earned=template.earned,
+        runtime_in_min=template.runtime_in_min,
+        is_runpod=template.is_runpod
+    )
+
+
+def _format_executor_response(executor) -> ExecutorResponse:
+    """Format executor for endpoint response"""
+    return ExecutorResponse(
+        id=str(executor.id),  # Convert to string as per spec
+        name=executor.name,
+        gpu_type=executor.gpu_type,
+        gpu_count=executor.gpu_count,
+        cuda_version=executor.cuda_version,
+        compute_type=executor.compute_type,
+        is_active=executor.is_active,
+        is_online=executor.is_online
+    )
+
+
+def _format_endpoint_response(endpoint) -> EndpointResponse:
+    """Format endpoint for response matching RunPod API format"""
+    return EndpointResponse(
+        id=endpoint.endpoint_id,
+        name=endpoint.name,
+        allowed_cuda_versions=endpoint.allowed_cuda_versions or [],
+        compute_type=endpoint.compute_type,
+        executor_id=str(endpoint.executor.id),  # String representation
+        execution_timeout_ms=endpoint.execution_timeout_ms,
+        idle_timeout=endpoint.idle_timeout,
+        template_id=endpoint.template_id,
+        vcpu_count=endpoint.vcpu_count,
+        env=endpoint.env or {},
+        version=endpoint.version,
+        created_at=endpoint.created_at,
+        template=_format_template_response(endpoint.template),
+        executor=_format_executor_response(endpoint.executor),
+        user_id=str(endpoint.user_id)  # String representation
+    )
+
+
+@router.post("/", response_model=EndpointResponse, status_code=status.HTTP_200_OK)
 async def create_endpoint(
     endpoint_data: EndpointCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new endpoint"""
+    """Create an endpoint from template"""
     endpoint_service = EndpointService(db)
     
     try:
         endpoint = endpoint_service.create_endpoint(current_user.id, endpoint_data)
-        return endpoint
+        # Reload with relationships
+        endpoint = endpoint_service.get_endpoint(endpoint.endpoint_id, current_user.id)
+        return _format_endpoint_response(endpoint)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
 
 
 @router.get("/", response_model=List[EndpointResponse])
-async def get_user_endpoints(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+async def get_endpoints(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get current user's endpoints"""
+    """List user endpoints"""
     endpoint_service = EndpointService(db)
-    endpoints = endpoint_service.get_user_endpoints(current_user.id, skip, limit)
-    return endpoints
-
-
-@router.get("/public/", response_model=List[EndpointResponse])
-async def get_public_endpoints(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
-):
-    """Get public endpoints"""
-    endpoint_service = EndpointService(db)
-    endpoints = endpoint_service.get_public_endpoints(skip, limit)
-    return endpoints
+    endpoints = endpoint_service.get_user_endpoints(current_user.id)
+    return [_format_endpoint_response(e) for e in endpoints]
 
 
 @router.get("/{endpoint_id}", response_model=EndpointResponse)
@@ -68,10 +117,10 @@ async def get_endpoint(
     if not endpoint:
         raise HTTPException(status_code=404, detail="Endpoint not found")
     
-    return endpoint
+    return _format_endpoint_response(endpoint)
 
 
-@router.put("/{endpoint_id}", response_model=EndpointResponse)
+@router.patch("/{endpoint_id}", response_model=EndpointResponse)
 async def update_endpoint(
     endpoint_id: str,
     endpoint_update: EndpointUpdate,
@@ -80,19 +129,24 @@ async def update_endpoint(
 ):
     """Update an endpoint"""
     endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
     
-    if not endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
+    # Validate endpoint ID format
+    if not endpoint_id or len(endpoint_id) < 1:
+        raise HTTPException(status_code=400, detail="Invalid endpoint id supplied")
     
-    updated_endpoint = endpoint_service.update_endpoint(endpoint.id, endpoint_update, current_user.id)
-    if not updated_endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    return updated_endpoint
+    try:
+        updated_endpoint = endpoint_service.update_endpoint(endpoint_id, endpoint_update, current_user.id)
+        if not updated_endpoint:
+            raise HTTPException(status_code=404, detail="Endpoint not found")
+        
+        # Reload with relationships
+        updated_endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
+        return _format_endpoint_response(updated_endpoint)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{endpoint_id}")
+@router.delete("/{endpoint_id}", status_code=status.HTTP_200_OK)
 async def delete_endpoint(
     endpoint_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -100,216 +154,25 @@ async def delete_endpoint(
 ):
     """Delete an endpoint"""
     endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
     
-    if not endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
+    # Validate endpoint ID format
+    if not endpoint_id or len(endpoint_id) < 1:
+        raise HTTPException(status_code=400, detail="Invalid endpoint id supplied")
     
-    success = endpoint_service.delete_endpoint(endpoint.id, current_user.id)
+    success = endpoint_service.delete_endpoint(endpoint_id, current_user.id)
     if not success:
         raise HTTPException(status_code=404, detail="Endpoint not found")
     
     return {"message": "Endpoint deleted successfully"}
 
 
-@router.post("/{endpoint_id}/scale")
-async def scale_endpoint(
+@router.post("/{endpoint_id}/update", response_model=EndpointResponse)
+async def update_endpoint_synonym(
     endpoint_id: str,
-    scale_request: EndpointScaleRequest,
+    endpoint_update: EndpointUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Scale an endpoint"""
-    endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    
-    if not endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    success = endpoint_service.scale_endpoint(endpoint.id, scale_request.target_replicas, current_user.id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to scale endpoint")
-    
-    return {"message": f"Endpoint scaled to {scale_request.target_replicas} replicas"}
-
-
-@router.get("/{endpoint_id}/stats", response_model=EndpointStatsResponse)
-async def get_endpoint_stats(
-    endpoint_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get endpoint statistics"""
-    endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    
-    if not endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    stats = endpoint_service.get_endpoint_stats(endpoint.id, current_user.id)
-    if not stats:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    return stats
-
-
-@router.get("/{endpoint_id}/deployments/", response_model=List[EndpointDeploymentResponse])
-async def get_endpoint_deployments(
-    endpoint_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get endpoint deployments"""
-    endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    
-    if not endpoint:
-        raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    # Get deployments from database
-    from app.models.endpoint import EndpointDeployment
-    deployments = (
-        db.query(EndpointDeployment)
-        .filter(EndpointDeployment.endpoint_id == endpoint.id)
-        .order_by(EndpointDeployment.created_at.desc())
-        .all()
-    )
-    
-    return deployments
-
-
-@router.post("/upload-image")
-async def upload_docker_image(
-    image_upload: DockerImageUpload,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Upload Docker image to registry"""
-    # This would integrate with Docker registry APIs
-    # For now, just return success
-    return {
-        "message": "Image upload initiated",
-        "image_name": image_upload.image_name,
-        "image_tag": image_upload.image_tag,
-        "registry_url": image_upload.registry_url
-    }
-
-
-@router.post("/upload-image-file")
-async def upload_docker_image_file(
-    file: UploadFile = File(...),
-    image_name: str = Query(...),
-    image_tag: str = Query("latest"),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Upload Docker image file"""
-    # This would handle Docker image file uploads
-    # For now, just return success
-    return {
-        "message": "Image file upload initiated",
-        "filename": file.filename,
-        "image_name": image_name,
-        "image_tag": image_tag,
-        "size": file.size
-    }
-
-
-# Custom endpoint routing for job execution
-@router.post("/{endpoint_id}/jobs/", response_model=EndpointJobResponse)
-async def create_endpoint_job(
-    endpoint_id: str,
-    job_request: EndpointJobRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Create a job for an endpoint"""
-    endpoint_service = EndpointService(db)
-    
-    # Check if endpoint exists and user has access
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    if not endpoint:
-        # Check if it's a public endpoint
-        endpoint = endpoint_service.get_endpoint(endpoint_id)
-        if not endpoint or not endpoint.is_public:
-            raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    result = endpoint_service.create_endpoint_job(endpoint_id, job_request, current_user.id)
-    if not result:
-        raise HTTPException(status_code=400, detail="Failed to create job")
-    
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    
-    return result
-
-
-@router.get("/{endpoint_id}/jobs/{job_id}", response_model=EndpointJobResponse)
-async def get_endpoint_job(
-    endpoint_id: str,
-    job_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get job status from endpoint"""
-    endpoint_service = EndpointService(db)
-    
-    # Check if endpoint exists and user has access
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    if not endpoint:
-        # Check if it's a public endpoint
-        endpoint = endpoint_service.get_endpoint(endpoint_id)
-        if not endpoint or not endpoint.is_public:
-            raise HTTPException(status_code=404, detail="Endpoint not found")
-    
-    result = endpoint_service.get_endpoint_job(endpoint_id, job_id, current_user.id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return result
-
-
-# Public endpoint access (no authentication required for public endpoints)
-@router.post("/public/{endpoint_id}/jobs/", response_model=EndpointJobResponse)
-async def create_public_endpoint_job(
-    endpoint_id: str,
-    job_request: EndpointJobRequest,
-    db: Session = Depends(get_db)
-):
-    """Create a job for a public endpoint (no authentication required)"""
-    endpoint_service = EndpointService(db)
-    
-    # Check if endpoint exists and is public
-    endpoint = endpoint_service.get_endpoint(endpoint_id)
-    if not endpoint or not endpoint.is_public:
-        raise HTTPException(status_code=404, detail="Public endpoint not found")
-    
-    result = endpoint_service.create_endpoint_job(endpoint_id, job_request)
-    if not result:
-        raise HTTPException(status_code=400, detail="Failed to create job")
-    
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    
-    return result
-
-
-@router.get("/public/{endpoint_id}/jobs/{job_id}", response_model=EndpointJobResponse)
-async def get_public_endpoint_job(
-    endpoint_id: str,
-    job_id: str,
-    db: Session = Depends(get_db)
-):
-    """Get job status from public endpoint (no authentication required)"""
-    endpoint_service = EndpointService(db)
-    
-    # Check if endpoint exists and is public
-    endpoint = endpoint_service.get_endpoint(endpoint_id)
-    if not endpoint or not endpoint.is_public:
-        raise HTTPException(status_code=404, detail="Public endpoint not found")
-    
-    result = endpoint_service.get_endpoint_job(endpoint_id, job_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return result
+    """Update an endpoint (synonym for PATCH /endpoints/{endpoint_id})"""
+    # Reuse the same logic as PATCH
+    return await update_endpoint(endpoint_id, endpoint_update, current_user, db)
