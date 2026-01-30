@@ -23,7 +23,7 @@ class Executor(Base):
     is_active = Column(Boolean, default=True)
     
     # Metadata
-    metadata = Column(JSON)  # Additional machine info
+    metadata_ = Column("metadata", JSON)  # Additional machine info
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.auth import get_current_active_user
+from app.api.helpers import get_current_active_user
 from app.models.user import User
 from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse

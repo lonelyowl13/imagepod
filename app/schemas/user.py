@@ -1,53 +1,64 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import datetime
+import re
+from pydantic import BaseModel, field_validator, model_validator
 
 
-class UserBase(BaseModel):
-    email: EmailStr
+def _alphanumeric(v: str) -> str:
+    if not v or not re.match(r"^[a-zA-Z0-9]+$", v):
+        raise ValueError("must be alphanumeric")
+    return v
+
+
+def _password_min_length(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("password must be at least 8 characters")
+    return v
+
+
+class RegisterRequest(BaseModel):
     username: str
-    full_name: Optional[str] = None
-
-
-class UserCreate(UserBase):
     password: str
+    password2: str
+
+    @field_validator("username")
+    @classmethod
+    def username_alphanumeric(cls, v: str) -> str:
+        return _alphanumeric(v)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _password_min_length(v)
+
+    @field_validator("password2")
+    @classmethod
+    def password2_strength(cls, v: str) -> str:
+        return _password_min_length(v)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.password != self.password2:
+            raise ValueError("passwords do not match")
+        return self
 
 
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    full_name: Optional[str] = None
-    bio: Optional[str] = None
-    avatar_url: Optional[str] = None
-    notification_preferences: Optional[dict] = None
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class UserResponse(UserBase):
+class UserResponse(BaseModel):
     id: int
-    is_active: bool
-    is_verified: bool
-    is_superuser: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    last_login: Optional[datetime] = None
-    avatar_url: Optional[str] = None
-    bio: Optional[str] = None
-    stripe_customer_id: Optional[str] = None
-    billing_email: Optional[str] = None
+    username: str
 
     class Config:
         from_attributes = True
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    refresh_token: str
+    token_type: str = "bearer"
 
 
-class TokenData(BaseModel):
-    email: Optional[str] = None
+class RefreshRequest(BaseModel):
+    refresh_token: str

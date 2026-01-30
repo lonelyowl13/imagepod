@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import get_current_active_user
+from app.api.helpers import get_current_active_user
 from app.models.user import User
 from app.schemas.job import JobResponse, JobRunRequest, JobRunResponse
 from app.services.job_service import JobService
