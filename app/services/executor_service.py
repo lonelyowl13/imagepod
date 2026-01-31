@@ -1,7 +1,6 @@
 import hashlib
 import secrets
 import string
-import uuid
 from typing import Optional, List, Tuple
 
 from sqlalchemy.orm import Session
@@ -80,18 +79,14 @@ def get_jobs_in_queue(db: Session, executor_id: int) -> List[Job]:
 def update_job_for_executor(
     db: Session,
     executor_id: int,
-    job_id: str,
+    job_id: int,
     *,
     status: Optional[str] = None,
     delay_time: Optional[int] = None,
     execution_time: Optional[int] = None,
     output_data: Optional[dict] = None,
 ) -> Optional[Job]:
-    try:
-        job_uuid = uuid.UUID(job_id)
-    except (ValueError, TypeError):
-        return None
-    job = db.query(Job).filter(Job.id == job_uuid, Job.executor_id == executor_id).first()
+    job = db.query(Job).filter(Job.id == job_id, Job.executor_id == executor_id).first()
     if not job:
         return None
     if status is not None:

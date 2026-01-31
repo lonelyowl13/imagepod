@@ -3,19 +3,19 @@ from typing import Optional, Dict, Any
 
 
 class JobRunRequest(BaseModel):
-    """Request body for POST /jobs/{endpoint_id}/run"""
+    """Request body for POST /jobs/{id}/run"""
     input: Dict[str, Any]
 
 
 class JobRunResponse(BaseModel):
-    """Response for POST /jobs/{endpoint_id}/run"""
-    id: str
+    """Response for POST /jobs/{id}/run"""
+    id: int
     status: str  # "IN_QUEUE"
 
 
 class JobResponse(BaseModel):
     """Job object per jobs.txt"""
-    id: str
+    id: int
     delay_time: int
     execution_time: int
     output: Optional[Dict[str, Any]] = None

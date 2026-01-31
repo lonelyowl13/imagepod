@@ -6,56 +6,48 @@ import uvicorn
 from app.config import settings
 from app.database import engine, Base
 from app.api import auth, jobs, endpoints, templates, executors
-from app.database import get_db
-from sqlalchemy.orm import Session
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
-    # Startup
+
     print("Starting ImagePod backend...")
-    
-    # Create database tables
+
     Base.metadata.create_all(bind=engine)
     print("Database tables created")
-    
-    # Start background tasks
-    # In production, you'd want to use a proper task queue like Celery
-    # For now, we'll just print that we're ready
+
     print("ImagePod backend is ready!")
     
     yield
     
-    # Shutdown
+    Base.metadata.drop_all(bind=engine)
+    print("Database tables nuked")
     print("Shutting down ImagePod backend...")
 
 
-# Create FastAPI app
 app = FastAPI(
     title="ImagePod API",
-    description="RunPod clone backend service for AI/ML job processing",
+    description="Runpod-esque backend to run random stuff on your friend's gpu",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.debug else ["https://yourdomain.com"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Add trusted host middleware
 if not settings.debug:
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["yourdomain.com", "*.yourdomain.com"]
+        allowed_hosts=["*"]
     )
 
-# Include API routers
+
 app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(endpoints.router)

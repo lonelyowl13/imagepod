@@ -10,9 +10,8 @@ class Endpoint(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    endpoint_id = Column(String, unique=True, index=True)  # API "id" (e.g. "jpnw0v75y3qoql")
     name = Column(String, nullable=False)
-    template_id = Column(String, ForeignKey("templates.template_id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("templates.id"), nullable=False)
     executor_id = Column(Integer, ForeignKey("executors.id"), nullable=False)
 
     compute_type = Column(String, default="GPU")
@@ -24,10 +23,6 @@ class Endpoint(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="endpoints")
-    template = relationship(
-        "Template",
-        foreign_keys=[template_id],
-        primaryjoin="Endpoint.template_id == Template.template_id",
-    )
+    template = relationship("Template", backref="endpoints")
     executor = relationship("Executor", back_populates="endpoints")
     jobs = relationship("Job", back_populates="endpoint")

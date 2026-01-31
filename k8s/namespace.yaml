@@ -12,11 +12,10 @@ metadata:
   namespace: imagepod
 type: Opaque
 data:
-  # Base64 encoded values
-  secret-key: MFp1WWs5TzFzbGF3MzVqSXRYdi1WRzR6VU15eEFSLXF1QjVFa1pkbHVESQ==
-  registration-token: dEpDUU9nT3RzMFpkMTl6NUhVY08zWjJDY3l5cVRuekVtZnJoMzNUSjRfMA==
-  postgres-password: S2tjN0hHTmp4RWJrQlVOME9LMlNyQQ==
-  redis-password: dEQwRmU3T2l1RVpEc3pYeF9HckZMQQ==
+  secret-key: <nothing>
+  registration-token: <nothing>
+  postgres-password: <nothing>
+  redis-password: <nothing>
 ---
 apiVersion: v1
 kind: ConfigMap

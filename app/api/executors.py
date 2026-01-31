@@ -66,7 +66,7 @@ def list_executor_jobs(
     jobs = get_jobs_in_queue(db, executor.id)
     return [
         JobResponse(
-            id=str(j.id),
+            id=j.id,
             delay_time=j.delay_time,
             execution_time=j.execution_time,
             output=j.output_data,
@@ -81,7 +81,7 @@ def list_executor_jobs(
 
 @router.patch("/job/{job_id}")
 def update_job(
-    job_id: str,
+    job_id: int,
     body: ExecutorJobUpdateRequest,
     executor: Executor = Depends(get_current_executor),
     db: Session = Depends(get_db),
@@ -98,7 +98,7 @@ def update_job(
     )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"detail": "ok", "id": str(job.id)}
+    return {"detail": "ok", "id": job.id}
 
 
 @router.get("/endpoints")
@@ -111,7 +111,6 @@ def list_executor_endpoints(
     return [
         {
             "id": e.id,
-            "endpoint_id": e.endpoint_id,
             "name": e.name,
             "template_id": e.template_id,
             "executor_id": e.executor_id,

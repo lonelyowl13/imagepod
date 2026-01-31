@@ -8,40 +8,25 @@ from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 )
 from app.schemas.template import TemplateResponse
-from app.services.endpoint_service import EndpointService
-
 router = APIRouter(prefix="/endpoints", tags=["endpoints"])
 
 
 def _format_template_response(template) -> TemplateResponse:
     """Format template for endpoint response"""
-    from app.schemas.template import TemplateResponse
     return TemplateResponse(
-        id=template.template_id,
+        id=template.id,
         name=template.name,
         image_name=template.image_name,
-        category=template.category,
-        container_disk_in_gb=template.container_disk_in_gb,
-        container_registry_auth_id=template.container_registry_auth_id,
         docker_entrypoint=template.docker_entrypoint or [],
         docker_start_cmd=template.docker_start_cmd or [],
         env=template.env or {},
-        ports=template.ports or [],
-        readme=template.readme or "",
-        volume_in_gb=template.volume_in_gb,
-        volume_mount_path=template.volume_mount_path,
-        is_public=template.is_public,
-        is_serverless=template.is_serverless,
-        earned=template.earned,
-        runtime_in_min=template.runtime_in_min,
-        is_runpod=template.is_runpod
     )
 
 
 def _format_executor_response(executor) -> ExecutorResponse:
     """Format executor for endpoint response"""
     return ExecutorResponse(
-        id=str(executor.id),
+        id=executor.id,
         name=executor.name,
         gpu_type=getattr(executor, "gpu", None) or getattr(executor, "gpu_type", None),
         gpu_count=getattr(executor, "gpu_count", 1),
@@ -52,12 +37,12 @@ def _format_executor_response(executor) -> ExecutorResponse:
 
 
 def _format_endpoint_response(endpoint) -> EndpointResponse:
-    """Format endpoint for response matching RunPod API format"""
+    """Format endpoint for response"""
     return EndpointResponse(
-        id=endpoint.endpoint_id,
+        id=endpoint.id,
         name=endpoint.name,
         compute_type=endpoint.compute_type,
-        executor_id=str(endpoint.executor.id),
+        executor_id=endpoint.executor.id,
         execution_timeout_ms=endpoint.execution_timeout_ms,
         idle_timeout=endpoint.idle_timeout,
         template_id=endpoint.template_id,
@@ -67,7 +52,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         created_at=endpoint.created_at,
         template=_format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),
-        user_id=str(endpoint.user_id),
+        user_id=endpoint.user_id,
     )
 
 
@@ -75,102 +60,71 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
 async def create_endpoint(
     endpoint_data: EndpointCreate,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Create an endpoint from template"""
-    endpoint_service = EndpointService(db)
-    
+    from app.services.endpoint_service import create_endpoint as svc_create, get_endpoint
     try:
-        endpoint = endpoint_service.create_endpoint(current_user.id, endpoint_data)
-        # Reload with relationships
-        endpoint = endpoint_service.get_endpoint(endpoint.endpoint_id, current_user.id)
+        endpoint = svc_create(db, current_user.id, endpoint_data)
+        endpoint = get_endpoint(db, endpoint.id, current_user.id)
         return _format_endpoint_response(endpoint)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
 
 
 @router.get("/", response_model=List[EndpointResponse])
-async def get_endpoints(
+async def list_endpoints(
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """List user endpoints"""
-    endpoint_service = EndpointService(db)
-    endpoints = endpoint_service.get_user_endpoints(current_user.id)
+    from app.services.endpoint_service import get_user_endpoints
+    endpoints = get_user_endpoints(db, current_user.id)
     return [_format_endpoint_response(e) for e in endpoints]
 
 
-@router.get("/{endpoint_id}", response_model=EndpointResponse)
-async def get_endpoint(
-    endpoint_id: str,
+@router.get("/{id}", response_model=EndpointResponse)
+async def get_endpoint_route(
+    id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get a specific endpoint"""
-    endpoint_service = EndpointService(db)
-    endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-    
+    from app.services.endpoint_service import get_endpoint
+    endpoint = get_endpoint(db, id, current_user.id)
     if not endpoint:
         raise HTTPException(status_code=404, detail="Endpoint not found")
-    
     return _format_endpoint_response(endpoint)
 
 
-@router.patch("/{endpoint_id}", response_model=EndpointResponse)
-async def update_endpoint(
-    endpoint_id: str,
+@router.patch("/{id}", response_model=EndpointResponse)
+async def update_endpoint_route(
+    id: int,
     endpoint_update: EndpointUpdate,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Update an endpoint"""
-    endpoint_service = EndpointService(db)
-    
-    # Validate endpoint ID format
-    if not endpoint_id or len(endpoint_id) < 1:
-        raise HTTPException(status_code=400, detail="Invalid endpoint id supplied")
-    
+    from app.services.endpoint_service import update_endpoint, get_endpoint
     try:
-        updated_endpoint = endpoint_service.update_endpoint(endpoint_id, endpoint_update, current_user.id)
-        if not updated_endpoint:
+        updated = update_endpoint(db, id, endpoint_update, current_user.id)
+        if not updated:
             raise HTTPException(status_code=404, detail="Endpoint not found")
-        
-        # Reload with relationships
-        updated_endpoint = endpoint_service.get_endpoint(endpoint_id, current_user.id)
-        return _format_endpoint_response(updated_endpoint)
+        updated = get_endpoint(db, id, current_user.id)
+        return _format_endpoint_response(updated)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{endpoint_id}", status_code=status.HTTP_200_OK)
-async def delete_endpoint(
-    endpoint_id: str,
+@router.delete("/{id}", status_code=status.HTTP_200_OK)
+async def delete_endpoint_route(
+    id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Delete an endpoint"""
-    endpoint_service = EndpointService(db)
-    
-    # Validate endpoint ID format
-    if not endpoint_id or len(endpoint_id) < 1:
-        raise HTTPException(status_code=400, detail="Invalid endpoint id supplied")
-    
-    success = endpoint_service.delete_endpoint(endpoint_id, current_user.id)
-    if not success:
+    from app.services.endpoint_service import delete_endpoint
+    if not delete_endpoint(db, id, current_user.id):
         raise HTTPException(status_code=404, detail="Endpoint not found")
-    
     return {"message": "Endpoint deleted successfully"}
 
-
-@router.post("/{endpoint_id}/update", response_model=EndpointResponse)
-async def update_endpoint_synonym(
-    endpoint_id: str,
-    endpoint_update: EndpointUpdate,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Update an endpoint (synonym for PATCH /endpoints/{endpoint_id})"""
-    # Reuse the same logic as PATCH
-    return await update_endpoint(endpoint_id, endpoint_update, current_user, db)

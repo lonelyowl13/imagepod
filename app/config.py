@@ -4,30 +4,22 @@ import os
 
 
 class Settings(BaseSettings):
-    # Database
-    database_url: str = "postgresql://user:password@localhost:5432/imagepod"
+    
+    postgres_db: str = ""
+    postgres_user: str = ""
+    postgres_password: str = ""
+    redis_password: str = ""
+
     redis_url: str = "redis://localhost:6379/0"
     
     # Security
-    secret_key: str = "your-secret-key-here"
+    secret_key: str = os.getenv("SECRET_KEY")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     
-    # AWS
-    aws_access_key_id: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
-    aws_region: str = "us-east-1"
-    
     # Kubernetes
     kubeconfig_path: Optional[str] = None
-    
-    # Docker
-    docker_registry: str = "your-registry.com"
-    docker_image_prefix: str = "imagepod"
-    
-    # Monitoring
-    prometheus_port: int = 8001
     
     # Environment
     environment: str = "development"
@@ -36,6 +28,10 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    
+    def get_db_url(self):
+        return f"postgresql://{self.postgres_user}:{self.postgres_password}@localhost:5432/{self.postgres_db}"
 
 
 settings = Settings()
