@@ -41,14 +41,13 @@ def _format_template_response(template) -> TemplateResponse:
 def _format_executor_response(executor) -> ExecutorResponse:
     """Format executor for endpoint response"""
     return ExecutorResponse(
-        id=str(executor.id),  # Convert to string as per spec
+        id=str(executor.id),
         name=executor.name,
-        gpu_type=executor.gpu_type,
-        gpu_count=executor.gpu_count,
+        gpu_type=getattr(executor, "gpu", None) or getattr(executor, "gpu_type", None),
+        gpu_count=getattr(executor, "gpu_count", 1),
         cuda_version=executor.cuda_version,
-        compute_type=executor.compute_type,
+        compute_type=executor.compute_type or "GPU",
         is_active=executor.is_active,
-        is_online=executor.is_online
     )
 
 
@@ -57,9 +56,8 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
     return EndpointResponse(
         id=endpoint.endpoint_id,
         name=endpoint.name,
-        allowed_cuda_versions=endpoint.allowed_cuda_versions or [],
         compute_type=endpoint.compute_type,
-        executor_id=str(endpoint.executor.id),  # String representation
+        executor_id=str(endpoint.executor.id),
         execution_timeout_ms=endpoint.execution_timeout_ms,
         idle_timeout=endpoint.idle_timeout,
         template_id=endpoint.template_id,
@@ -69,7 +67,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         created_at=endpoint.created_at,
         template=_format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),
-        user_id=str(endpoint.user_id)  # String representation
+        user_id=str(endpoint.user_id),
     )
 
 

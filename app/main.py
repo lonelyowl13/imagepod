@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from app.config import settings
 from app.database import engine, Base
-from app.api import auth, jobs, endpoints, templates
+from app.api import auth, jobs, endpoints, templates, executors
 from app.database import get_db
 from sqlalchemy.orm import Session
 
@@ -60,6 +60,7 @@ app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(endpoints.router)
 app.include_router(templates.router)
+app.include_router(executors.router)
 
 
 @app.get("/")

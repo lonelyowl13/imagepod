@@ -42,13 +42,12 @@ class EndpointService:
             name=endpoint_data.name,
             template_id=endpoint_data.template_id,
             executor_id=endpoint_data.executor_id,
-            allowed_cuda_versions=endpoint_data.allowed_cuda_versions,
             compute_type=endpoint_data.compute_type,
             execution_timeout_ms=endpoint_data.execution_timeout_ms,
             idle_timeout=endpoint_data.idle_timeout,
             vcpu_count=endpoint_data.vcpu_count,
             env=env,
-            version=0
+            version=0,
         )
 
         self.db.add(db_endpoint)
@@ -99,13 +98,7 @@ class EndpointService:
             if not executor:
                 raise ValueError("Executor not found")
 
-        # Use model_dump with by_alias=False to get snake_case field names
         update_data = endpoint_update.model_dump(exclude_unset=True, by_alias=False)
-        
-        # Increment version on update
-        if update_data:
-            endpoint.version += 1
-        
         for field, value in update_data.items():
             setattr(endpoint, field, value)
 

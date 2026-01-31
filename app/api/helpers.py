@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.services.auth_service import verify_token, get_user_by_username
 from app.services.api_key_service import get_user_by_api_key
+from app.services.executor_service import get_executor_by_api_key
 
 security = HTTPBearer()
 
@@ -46,3 +47,19 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+async def get_current_executor(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    """Resolve executor from Bearer token (executor API key). Used by executor-only routes."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid executor credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    executor = get_executor_by_api_key(db, credentials.credentials)
+    if executor is None:
+        raise credentials_exception
+    return executor

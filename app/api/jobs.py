@@ -52,7 +52,8 @@ async def get_job_status(
         output=job.output_data,
         input=job.input_data,
         status=job.status,
-        endpoint_id=job.endpoint_id
+        endpoint_id=job.endpoint_id,
+        executor_id=job.executor_id,
     )
 
 
@@ -83,5 +84,6 @@ async def cancel_job(
         output=cancelled_job.output_data,
         input=cancelled_job.input_data,
         status=cancelled_job.status,
-        endpoint_id=cancelled_job.endpoint_id
+        endpoint_id=cancelled_job.endpoint_id,
+        executor_id=cancelled_job.executor_id,
     )

@@ -14,7 +14,5 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
-    jobs = relationship("Job", back_populates="user")
-    created_templates = relationship("JobTemplate", back_populates="creator")
     endpoints = relationship("Endpoint", back_populates="user")
     templates = relationship("Template", back_populates="user")

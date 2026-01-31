@@ -9,19 +9,20 @@ class JobRunRequest(BaseModel):
 
 class JobRunResponse(BaseModel):
     """Response for POST /jobs/{endpoint_id}/run"""
-    id: str  # UUID as string
+    id: str
     status: str  # "IN_QUEUE"
 
 
 class JobResponse(BaseModel):
-    """Full job response"""
-    id: str  # UUID as string
+    """Job object per jobs.txt"""
+    id: str
     delay_time: int
     execution_time: int
     output: Optional[Dict[str, Any]] = None
     input: Dict[str, Any]
     status: str  # IN_QUEUE | RUNNING | COMPLETED | FAILED | CANCELLED | TIMED_OUT
-    endpoint_id: Optional[int] = None
+    endpoint_id: int
+    executor_id: int
 
     class Config:
         from_attributes = True
@@ -31,8 +32,4 @@ class JobStatusUpdate(BaseModel):
     """Used by external workers to update job status"""
     status: str
     output_data: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
-    gpu_memory_used: Optional[int] = None
-    cpu_cores_used: Optional[int] = None
-    ram_used: Optional[int] = None
-    duration_seconds: Optional[float] = None
+    execution_time: Optional[int] = None  # milliseconds

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON
+from sqlalchemy import BigInteger, Column, Integer, String, Boolean, DateTime, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -8,16 +8,17 @@ class Executor(Base):
     __tablename__ = "executors"
 
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Executor identification
-    executor_id = Column(String, unique=True, index=True)  # Custom executor ID
+    token_hash = Column(String(64), unique=True, index=True)  # SHA-256 of API key; set when executor is added
+
     name = Column(String)
     
-    # Machine information (to be expanded later)
-    gpu_type = Column(String)  # e.g., "NVIDIA GeForce RTX 4090"
-    gpu_count = Column(Integer, default=1)
+    gpu = Column(String)  # e.g., "NVIDIA GeForce RTX 4090"
+    cpu = Column(String)
+    ram = Column(BigInteger) # total ram in bytes
+    vram = Column(BigInteger) # total vram in bytes 
+    
     cuda_version = Column(String)  # e.g., "12.9"
-    compute_type = Column(String, default="GPU")  # GPU, CPU, etc.
+    compute_type = Column(String)  # GPU, CPU, etc.
     
     # Status
     is_active = Column(Boolean, default=True)
