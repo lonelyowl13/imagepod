@@ -11,6 +11,9 @@ from app.services.auth_service import (
     verify_refresh_token,
 )
 from app.schemas.user import (
+    ApiKey,
+    ApiKeyMetadata,
+    KeyList,
     RegisterRequest,
     UserResponse,
     LoginRequest,
@@ -92,16 +95,18 @@ async def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/keys")
+@router.get("/keys", response_model=KeyList)
 async def list_api_keys(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """List API key metadata (id, created_at) for the current user. Does not return key values."""
-    return {"keys": list_keys(db, current_user.id)}
+
+    return KeyList(keys=[ApiKeyMetadata(id=k["id"], created_at=k["created_at"]) for k in list_keys(db, current_user.id)])
 
 
-@router.get("/key")
+
+@router.get("/key", response_model=ApiKey)
 async def create_api_key(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -111,7 +116,8 @@ async def create_api_key(
     if not result:
         raise HTTPException(status_code=400, detail="Failed to create API key")
     key_id, raw_key = result
-    return {"id": key_id, "api_key": raw_key}
+    
+    return ApiKey(id=key_id, api_key=raw_key)
 
 
 @router.delete("/key/{key_id}")
@@ -123,4 +129,4 @@ async def delete_api_key_route(
     """Delete an API key by id. Key must belong to the current user."""
     if not delete_api_key(db, current_user.id, key_id):
         raise HTTPException(status_code=404, detail="API key not found")
-    return {"detail": "API key deleted"}
+    return "API key deleted"

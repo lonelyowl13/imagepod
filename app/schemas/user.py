@@ -62,3 +62,18 @@ class Token(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class ApiKey(BaseModel):
+    id: int
+    api_key: str
+
+
+class ApiKeyMetadata(BaseModel):
+    id: int 
+    created_at: str
+
+
+class KeyList(BaseModel):
+    keys: list[ApiKeyMetadata]
+

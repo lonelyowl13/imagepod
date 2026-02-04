@@ -1,4 +1,4 @@
-from .user import RegisterRequest, LoginRequest, RefreshRequest, UserResponse, Token
+from .user import RegisterRequest, LoginRequest, RefreshRequest, UserResponse, Token, ApiKey, ApiKeyMetadata, KeyList
 from .job import JobResponse, JobRunRequest, JobRunResponse, JobStatusUpdate
 from .endpoint import EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 from .template import TemplateCreate, TemplateUpdate, TemplateResponse
@@ -7,5 +7,5 @@ __all__ = [
     "RegisterRequest", "LoginRequest", "RefreshRequest", "UserResponse", "Token",
     "JobResponse", "JobRunRequest", "JobRunResponse", "JobStatusUpdate",
     "EndpointCreate", "EndpointUpdate", "EndpointResponse", "ExecutorResponse",
-    "TemplateCreate", "TemplateUpdate", "TemplateResponse"
+    "TemplateCreate", "TemplateUpdate", "TemplateResponse", "ApiKey", "ApiKeyMetadata", "KeyList"
 ]
