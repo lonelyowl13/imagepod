@@ -19,48 +19,41 @@ class ExecutorResponse(BaseModel):
 
 
 class EndpointCreate(BaseModel):
-    computeType: str = Field("GPU", alias="compute_type")
-    executorId: int = Field(..., alias="executor_id")
-    executionTimeoutMs: int = Field(600000, alias="execution_timeout_ms")
-    idleTimeout: int = Field(5, alias="idle_timeout")
+    compute_type: str = Field("GPU")
+    executor_id: int = Field(...)
+    execution_timeout_ms: int = Field(600000)
+    idle_timeout: int = Field(5)
     name: str
-    templateId: int = Field(..., alias="template_id")
-    vcpuCount: int = Field(2, alias="vcpu_count")
-
-    class Config:
-        populate_by_name = True
+    template_id: int = Field(...)
+    vcpu_count: int = Field(2)
 
 
 class EndpointUpdate(BaseModel):
     version: Optional[int] = None
-    computeType: Optional[str] = Field(None, alias="compute_type")
-    executorId: Optional[int] = Field(None, alias="executor_id")
-    executionTimeoutMs: Optional[int] = Field(None, alias="execution_timeout_ms")
-    idleTimeout: Optional[int] = Field(None, alias="idle_timeout")
+    compute_type: Optional[str] = None
+    executor_id: Optional[int] = None
+    execution_timeout_ms: Optional[int] = None
+    idle_timeout: Optional[int] = None
     name: Optional[str] = None
-    templateId: Optional[int] = Field(None, alias="template_id")
-    vcpuCount: Optional[int] = Field(None, alias="vcpu_count")
-
-    class Config:
-        populate_by_name = True
+    template_id: Optional[int] = None
+    vcpu_count: Optional[int] = None
 
 
 class EndpointResponse(BaseModel):
     id: int
     name: str
-    computeType: str = Field(..., alias="compute_type")
-    executorId: int = Field(..., alias="executor_id")
-    executionTimeoutMs: int = Field(..., alias="execution_timeout_ms")
-    idleTimeout: int = Field(..., alias="idle_timeout")
-    templateId: int = Field(..., alias="template_id")
-    vcpuCount: int = Field(..., alias="vcpu_count")
+    compute_type: str = Field(...)
+    executor_id: int = Field(...)
+    execution_timeout_ms: int = Field(...)
+    idle_timeout: int = Field(...)
+    template_id: int = Field(...)
+    vcpu_count: int = Field(...)
     env: Dict[str, str] = Field(default_factory=dict)
     version: int = 0
-    createdAt: datetime = Field(..., alias="created_at")
+    created_at: datetime = Field(...)
     template: TemplateResponse
     executor: ExecutorResponse
-    userId: int = Field(..., alias="user_id")
+    user_id: int = Field(...)
 
     class Config:
         from_attributes = True
-        populate_by_name = True
