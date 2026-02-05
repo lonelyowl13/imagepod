@@ -18,11 +18,11 @@ def _generate_api_key() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(32))
 
 
-def create_executor_with_key(db: Session, name: str) -> Optional[Tuple[Executor, str]]:
+def create_executor_with_key(db: Session, user_id: int, name: str) -> Optional[Tuple[Executor, str]]:
     """Create executor and return (executor, raw_api_key)."""
     raw_key = _generate_api_key()
     key_hash = _hash_key(raw_key)
-    executor = Executor(name=name, token_hash=key_hash)
+    executor = Executor(name=name, token_hash=key_hash, user_id=user_id)
     db.add(executor)
     db.commit()
     db.refresh(executor)
@@ -104,3 +104,8 @@ def update_job_for_executor(
 
 def get_endpoints_for_executor(db: Session, executor_id: int) -> List[Endpoint]:
     return db.query(Endpoint).filter(Endpoint.executor_id == executor_id).all()
+
+
+def get_executors_for_user(db: Session, user_id: int) -> List[Executor]:
+    """Return all executors owned by the given user."""
+    return db.query(Executor).filter(Executor.user_id == user_id).all()

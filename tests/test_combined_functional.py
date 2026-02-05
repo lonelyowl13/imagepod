@@ -83,6 +83,21 @@ def executor(base_url, tokens):
     assert r.status_code == 200, r.text
     assert "api_key" in r.json().keys() and "executor_id" in r.json().keys()
 
+    headers = {"Authorization": f"Bearer {r.json()['api_key']}"}
+
+    body = {
+        "gpu": "gtx 1060",
+        "vram": 3221225472,
+        "cpu": "string",
+        "ram": 17179869184,
+        "compute_type": "string",
+        "cuda_version": "string",
+        "metadata": {}
+    }
+
+    r = requests.post(f"{base_url}/executors/register", headers=headers, json=body)
+
+
     return {
         "api_key": r.json()["api_key"],
         "executor_id": r.json()["executor_id"]

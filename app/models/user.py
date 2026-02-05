@@ -16,3 +16,4 @@ class User(Base):
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
     endpoints = relationship("Endpoint", back_populates="user")
     templates = relationship("Template", back_populates="user")
+    executors = relationship("Executor", back_populates="user")

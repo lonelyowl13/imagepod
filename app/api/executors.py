@@ -4,13 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.api.helpers import get_current_executor
+from app.api.helpers import get_current_executor, get_current_active_user
 from app.models.executor import Executor
+from app.models.user import User
 from app.schemas.executor import (
     ExecutorAddRequest,
     ExecutorAddResponse,
     ExecutorRegisterRequest,
     ExecutorJobUpdateRequest,
+    ExecutorSummary,
 )
 from app.schemas.job import JobResponse
 from app.services.executor_service import (
@@ -19,15 +21,20 @@ from app.services.executor_service import (
     get_jobs_in_queue,
     update_job_for_executor,
     get_endpoints_for_executor,
+    get_executors_for_user,
 )
 
 router = APIRouter(prefix="/executors", tags=["executors"])
 
 
 @router.post("/add", response_model=ExecutorAddResponse)
-def add_executor(body: ExecutorAddRequest, db: Session = Depends(get_db)):
+def add_executor(
+    body: ExecutorAddRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """Add an executor to the database. Returns API key and executor_id."""
-    result = create_executor_with_key(db, body.name)
+    result = create_executor_with_key(db, current_user.id, body.name)
     if not result:
         raise HTTPException(status_code=400, detail="Failed to create executor")
     executor, raw_key = result
@@ -99,6 +106,16 @@ def update_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {"detail": "ok", "id": job.id}
+
+
+@router.get("/", response_model=List[ExecutorSummary])
+def list_user_executors(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """List all executors owned by the current user."""
+    executors = get_executors_for_user(db, current_user.id)
+    return executors
 
 
 @router.get("/endpoints")

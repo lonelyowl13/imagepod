@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -26,3 +27,14 @@ class ExecutorJobUpdateRequest(BaseModel):
     execution_time: Optional[int] = None
     output_data: Optional[Dict[str, Any]] = None
     status: Optional[str] = None
+
+
+class ExecutorSummary(BaseModel):
+    id: int
+    name: Optional[str] = None
+    compute_type: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

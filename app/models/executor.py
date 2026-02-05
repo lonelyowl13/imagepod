@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Integer, String, Boolean, DateTime, Text, JSON
+from sqlalchemy import BigInteger, Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -9,6 +9,7 @@ class Executor(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token_hash = Column(String(64), unique=True, index=True)  # SHA-256 of API key; set when executor is added
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     name = Column(String)
     
@@ -33,3 +34,4 @@ class Executor(Base):
     
     # Relationships
     endpoints = relationship("Endpoint", back_populates="executor")
+    user = relationship("User", back_populates="executors")
