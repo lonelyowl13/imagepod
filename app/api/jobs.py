@@ -13,30 +13,30 @@ from app.services.job_service import (
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.post("/{id}/run", response_model=JobRunResponse, status_code=status.HTTP_200_OK)
+@router.post("/{endpoint_id}/run", response_model=JobRunResponse, status_code=status.HTTP_200_OK)
 async def run_job(
-    id: int,
+    endpoint_id: int,
     job_request: JobRunRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Submit a job to an endpoint"""
     try:
-        job = create_job_for_endpoint(db, id, current_user.id, job_request.input)
+        job = create_job_for_endpoint(db, endpoint_id, current_user.id, job_request.input)
         return JobRunResponse(id=job.id, status="IN_QUEUE")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{id}/status/{job_id}", response_model=JobResponse)
+@router.get("/{endpoint_id}/status/{job_id}", response_model=JobResponse)
 async def get_job_status(
-    id: int,
+    endpoint_id: int,
     job_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Get job status"""
-    job = get_job_by_endpoint(db, id, job_id, current_user.id)
+    job = get_job_by_endpoint(db, endpoint_id, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobResponse(
@@ -51,15 +51,15 @@ async def get_job_status(
     )
 
 
-@router.get("/{id}/cancel/{job_id}", response_model=JobResponse)
+@router.get("/{endpoint_id}/cancel/{job_id}", response_model=JobResponse)
 async def cancel_job_route(
-    id: int,
+    endpoint_id: int,
     job_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Cancel a job"""
-    job = get_job_by_endpoint(db, id, job_id, current_user.id)
+    job = get_job_by_endpoint(db, endpoint_id, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     cancelled = cancel_job(db, job_id, current_user.id)

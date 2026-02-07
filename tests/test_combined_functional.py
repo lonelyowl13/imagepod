@@ -83,14 +83,17 @@ def executor(base_url, tokens):
     assert r.status_code == 200, r.text
     assert "api_key" in r.json().keys() and "executor_id" in r.json().keys()
 
+    api_key = r.json()["api_key"]
+    executor_id = r.json()["executor_id"]
+
     headers = {"Authorization": f"Bearer {r.json()['api_key']}"}
 
     body = {
         "gpu": "gtx 1060",
         "vram": 3221225472,
-        "cpu": "string",
+        "cpu": "xeon e5",
         "ram": 17179869184,
-        "compute_type": "string",
+        "compute_type": "GPU",
         "cuda_version": "string",
         "metadata": {}
     }
@@ -99,6 +102,91 @@ def executor(base_url, tokens):
 
 
     return {
-        "api_key": r.json()["api_key"],
-        "executor_id": r.json()["executor_id"]
+        "api_key": api_key,
+        "executor_id": executor_id,
     }
+
+@pytest.mark.functional
+def test_deploy_endpoint(base_url, tokens, executor, template):
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    body = {
+        "compute_type": "GPU",
+        "executor_id": executor["executor_id"],
+        "execution_timeout_ms": 600000,
+        "idle_timeout": 5,
+        "name": "TestEndpoint",
+        "template_id": template["id"],
+        "vcpu_count": 2
+    }
+
+    r = requests.post(f"{base_url}/endpoints", headers=headers, json=body)
+
+    assert r.status_code == 200, r.text
+    assert "id" in r.json().keys()
+    assert r.json()["name"] == "TestEndpoint"
+    assert r.json()["executor_id"] == executor["executor_id"]
+    assert r.json()["template_id"] == template["id"]
+    assert r.json()["compute_type"] == "GPU"
+    assert r.json()["execution_timeout_ms"] == 600000
+    assert r.json()["idle_timeout"] == 5
+    assert r.json()["vcpu_count"] == 2
+
+
+@pytest.mark.functional
+def test_process_job(base_url, tokens, executor):
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    executor_headers = {"Authorization": f"Bearer {executor["api_key"]}"}
+
+    r = requests.get(f"{base_url}/endpoints", headers=headers)
+
+    assert r.status_code == 200, r.text
+
+    #got endpoint
+    endpoint = r.json()[0]
+
+    job = {        
+        "input": { "prompt": "pls gen an image" }
+    }
+
+    r = requests.post(f"{base_url}/jobs/{endpoint["id"]}/run", headers=headers, json=job)
+
+    # got job
+    assert r.status_code == 200, r.text
+    job_response = r.json()
+    assert "id" in job_response.keys(), job_response
+    assert job_response["status"] == "IN_QUEUE", job_response
+
+    # executor gets a job 
+    r = requests.get(f"{base_url}/executors/jobs", headers=executor_headers)
+
+    assert r.status_code == 200, r.text 
+    job = r.json()[0]
+
+    body = {
+        "delay_time": 123,
+        "execution_time": 1234,
+        "output_data": {
+            "image": "https://images.com/123456.png"
+        },
+        "status": "COMPLETED"
+    }
+
+    # executor completed the job
+    r = requests.patch(f"{base_url}/executors/job/{job["id"]}", headers=executor_headers, json=body)
+
+    assert r.status_code == 200, r.text
+
+    # user querying their job
+    r = requests.get(f"{base_url}/jobs/{endpoint["id"]}/status/{job["id"]}", headers=headers)
+
+    assert r.status_code == 200, r.text
+    completed_job = r.json()
+
+    assert completed_job["status"] == "COMPLETED", completed_job
+    assert completed_job["delay_time"] == 123, completed_job
+    assert completed_job["output"]["image"] == "https://images.com/123456.png", completed_job
+    
