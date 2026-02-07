@@ -6,6 +6,7 @@ import uvicorn
 from app.config import settings
 from app.database import engine, Base
 from app.api import auth, jobs, endpoints, templates, executors
+from app.rabbitmq import connect as rabbitmq_connect
 
 
 @asynccontextmanager
@@ -17,10 +18,20 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     print("Database tables created")
 
+    app.state.rabbitmq = None
+    try:
+        app.state.rabbitmq = await rabbitmq_connect(settings.get_rabbitmq_url())
+        print("RabbitMQ connected")
+    except Exception as e:
+        print(f"RabbitMQ connection failed: {e} (job long-poll will fall back to timeout-only)")
+
     print("ImagePod backend is ready!")
-    
+
     yield
-    
+
+    if app.state.rabbitmq:
+        await app.state.rabbitmq.close()
+        print("RabbitMQ connection closed")
     Base.metadata.drop_all(bind=engine)
     print("Database tables nuked")
     print("Shutting down ImagePod backend...")

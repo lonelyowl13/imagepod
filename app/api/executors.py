@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -23,6 +23,7 @@ from app.services.executor_service import (
     get_endpoints_for_executor,
     get_executors_for_user,
 )
+from app.rabbitmq import wait_for_job_notification
 
 router = APIRouter(prefix="/executors", tags=["executors"])
 
@@ -64,13 +65,8 @@ def register_executor(
     return {"detail": "ok", "executor_id": executor.id}
 
 
-@router.get("/jobs", response_model=List[JobResponse])
-def list_executor_jobs(
-    executor: Executor = Depends(get_current_executor),
-    db: Session = Depends(get_db),
-):
-    """Return all jobs for this executor with status IN_QUEUE."""
-    jobs = get_jobs_in_queue(db, executor.id)
+def _job_response_list(db: Session, executor_id: int) -> List[JobResponse]:
+    jobs = get_jobs_in_queue(db, executor_id)
     return [
         JobResponse(
             id=j.id,
@@ -84,6 +80,23 @@ def list_executor_jobs(
         )
         for j in jobs
     ]
+
+@router.get("/jobs", response_model=List[JobResponse])
+async def long_poll_jobs(
+    request: Request,
+    executor: Executor = Depends(get_current_executor),
+    db: Session = Depends(get_db),
+    timeout: float = 20.0,
+):
+    """
+    Long-poll: wait up to `timeout` seconds (max 60) for a job notification, then return current IN_QUEUE jobs.
+    If RabbitMQ is unavailable, returns immediately with current jobs.
+    """
+    wait_seconds = min(max(0.0, timeout), 60.0)
+    conn = getattr(request.app.state, "rabbitmq", None)
+    if conn and wait_seconds > 0:
+        await wait_for_job_notification(conn, executor.id, wait_seconds)
+    return _job_response_list(db, executor.id)
 
 
 @router.patch("/job/{job_id}")

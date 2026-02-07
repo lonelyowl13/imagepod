@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.api.helpers import get_current_active_user
@@ -9,12 +9,14 @@ from app.services.job_service import (
     get_job_by_endpoint,
     cancel_job,
 )
+from app.rabbitmq import publish_job_notification
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/{endpoint_id}/run", response_model=JobRunResponse, status_code=status.HTTP_200_OK)
 async def run_job(
+    request: Request,
     endpoint_id: int,
     job_request: JobRunRequest,
     current_user: User = Depends(get_current_active_user),
@@ -23,6 +25,9 @@ async def run_job(
     """Submit a job to an endpoint"""
     try:
         job = create_job_for_endpoint(db, endpoint_id, current_user.id, job_request.input)
+        conn = getattr(request.app.state, "rabbitmq", None)
+        if conn:
+            await publish_job_notification(conn, job.executor_id)
         return JobRunResponse(id=job.id, status="IN_QUEUE")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

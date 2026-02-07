@@ -12,3 +12,4 @@ pydantic[email]==2.5.0
 pydantic-settings==2.1.0
 httpx==0.25.2
 cryptography==41.0.7
+aio-pika==9.4.5
