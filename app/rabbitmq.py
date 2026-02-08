@@ -1,6 +1,6 @@
 """
-RabbitMQ job notifications: publish when a job is enqueued, long-poll wait for wake-up.
-One queue per executor: executor.{executor_id}. Jobs are stored in DB; we only signal "new work".
+RabbitMQ executor notifications: publish when a job is enqueued or an endpoint is assigned.
+One queue per executor: executor.{executor_id}. Long-poll wakes on any update.
 """
 import asyncio
 from aio_pika import connect_robust, Message, DeliveryMode
@@ -19,7 +19,7 @@ async def connect(rabbitmq_url: str) -> AbstractConnection:
 
 
 async def publish_job_notification(connection: AbstractConnection, executor_id: int) -> None:
-    """Notify that a new job is in queue for this executor. Idempotent queue declaration."""
+    """Notify executor of an update (new job or endpoint). Wakes long-poll /executors/updates."""
     channel: AbstractChannel = await connection.channel()
     queue_name = _queue_name(executor_id)
     await channel.declare_queue(queue_name, durable=False, auto_delete=True)
@@ -30,14 +30,14 @@ async def publish_job_notification(connection: AbstractConnection, executor_id: 
     await channel.close()
 
 
-async def wait_for_job_notification(
+async def wait_for_executor_notification(
     connection: AbstractConnection,
     executor_id: int,
     timeout: float,
 ) -> bool:
     """
-    Block until a job notification arrives or timeout. Returns True if a message was received.
-    Uses a dedicated channel and queue.get() with asyncio.wait_for.
+    Block until an executor notification arrives (new job or endpoint) or timeout.
+    Returns True if a message was received.
     """
     channel: AbstractChannel = await connection.channel()
     queue_name = _queue_name(executor_id)

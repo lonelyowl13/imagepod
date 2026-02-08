@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.api.helpers import get_current_executor, get_current_active_user
+from app.api.helpers import build_updates_response, get_current_executor, get_current_active_user
 from app.models.executor import Executor
 from app.models.user import User
 from app.schemas.executor import (
@@ -13,17 +13,16 @@ from app.schemas.executor import (
     ExecutorRegisterRequest,
     ExecutorJobUpdateRequest,
     ExecutorSummary,
+    ExecutorUpdatesResponse,
 )
-from app.schemas.job import JobResponse
 from app.services.executor_service import (
     create_executor_with_key,
     update_executor_spec,
-    get_jobs_in_queue,
     update_job_for_executor,
     get_endpoints_for_executor,
     get_executors_for_user,
 )
-from app.rabbitmq import wait_for_job_notification
+from app.rabbitmq import wait_for_executor_notification
 
 router = APIRouter(prefix="/executors", tags=["executors"])
 
@@ -65,38 +64,23 @@ def register_executor(
     return {"detail": "ok", "executor_id": executor.id}
 
 
-def _job_response_list(db: Session, executor_id: int) -> List[JobResponse]:
-    jobs = get_jobs_in_queue(db, executor_id)
-    return [
-        JobResponse(
-            id=j.id,
-            delay_time=j.delay_time,
-            execution_time=j.execution_time,
-            output=j.output_data,
-            input=j.input_data,
-            status=j.status,
-            endpoint_id=j.endpoint_id,
-            executor_id=j.executor_id,
-        )
-        for j in jobs
-    ]
-
-@router.get("/jobs", response_model=List[JobResponse])
-async def long_poll_jobs(
+@router.get("/updates", response_model=ExecutorUpdatesResponse)
+async def get_updates(
     request: Request,
     executor: Executor = Depends(get_current_executor),
     db: Session = Depends(get_db),
     timeout: float = 20.0,
 ):
     """
-    Long-poll: wait up to `timeout` seconds (max 60) for a job notification, then return current IN_QUEUE jobs.
-    If RabbitMQ is unavailable, returns immediately with current jobs.
+    Unified updates: jobs with status IN_QUEUE and endpoints with status Deploying.
+    Long-poll: wait up to `timeout` seconds (max 60) for a notification (new job or endpoint), then return.
+    If RabbitMQ is unavailable, returns immediately with current state.
     """
     wait_seconds = min(max(0.0, timeout), 60.0)
     conn = getattr(request.app.state, "rabbitmq", None)
     if conn and wait_seconds > 0:
-        await wait_for_job_notification(conn, executor.id, wait_seconds)
-    return _job_response_list(db, executor.id)
+        await wait_for_executor_notification(conn, executor.id, wait_seconds)
+    return build_updates_response(db, executor.id)
 
 
 @router.patch("/job/{job_id}")
@@ -142,6 +126,7 @@ def list_executor_endpoints(
         {
             "id": e.id,
             "name": e.name,
+            "status": getattr(e, "status", "Deploying"),
             "template_id": e.template_id,
             "executor_id": e.executor_id,
         }

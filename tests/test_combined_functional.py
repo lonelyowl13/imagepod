@@ -160,11 +160,13 @@ def test_process_job(base_url, tokens, executor):
     assert "id" in job_response.keys(), job_response
     assert job_response["status"] == "IN_QUEUE", job_response
 
-    # executor gets a job 
-    r = requests.get(f"{base_url}/executors/jobs", headers=executor_headers)
+    # executor gets updates (jobs IN_QUEUE + endpoints Deploying)
+    r = requests.get(f"{base_url}/executors/updates", headers=executor_headers, params={"timeout": 0})
 
-    assert r.status_code == 200, r.text 
-    job = r.json()[0]
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "jobs" in data and "endpoints" in data
+    job = data["jobs"][0]
 
     body = {
         "delay_time": 123,

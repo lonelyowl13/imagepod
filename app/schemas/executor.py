@@ -1,6 +1,9 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel
+
+from app.schemas.template import TemplateResponse
+from app.schemas.job import JobResponse
 
 
 class ExecutorAddRequest(BaseModel):
@@ -38,3 +41,24 @@ class ExecutorSummary(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class EndpointUpdateItem(BaseModel):
+    """Endpoint summary for executor updates (e.g. status=Deploying)."""
+    id: int
+    name: str
+    status: str
+    template_id: int
+    executor_id: int
+    template: TemplateResponse
+    env: Dict[str, Any]
+    version: int
+
+    class Config:
+        from_attributes = True
+
+
+class ExecutorUpdatesResponse(BaseModel):
+    """Unified response for GET /executors/updates: jobs IN_QUEUE + endpoints with status Deploying."""
+    jobs: List[JobResponse]
+    endpoints: List[EndpointUpdateItem]

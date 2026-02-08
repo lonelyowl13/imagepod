@@ -3,7 +3,7 @@ import secrets
 import string
 from typing import Optional, List, Tuple
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.executor import Executor
 from app.models.job import Job
 from app.models.endpoint import Endpoint
@@ -104,6 +104,18 @@ def update_job_for_executor(
 
 def get_endpoints_for_executor(db: Session, executor_id: int) -> List[Endpoint]:
     return db.query(Endpoint).filter(Endpoint.executor_id == executor_id).all()
+
+
+def get_endpoints_for_executor_by_status(
+    db: Session, executor_id: int, status: str
+) -> List[Endpoint]:
+    """Return endpoints for this executor with the given status (e.g. 'Deploying'), with template loaded."""
+    return (
+        db.query(Endpoint)
+        .options(joinedload(Endpoint.template))
+        .filter(Endpoint.executor_id == executor_id, Endpoint.status == status)
+        .all()
+    )
 
 
 def get_executors_for_user(db: Session, user_id: int) -> List[Executor]:

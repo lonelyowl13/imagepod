@@ -20,6 +20,7 @@ class Endpoint(Base):
     vcpu_count = Column(Integer, default=2)
     env = Column(JSON)  # env vars (can override template)
     version = Column(Integer, default=0)
+    status = Column(String, default="Deploying", server_default="Deploying")  # Deploying | Ready | Unhealthy
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="endpoints")

@@ -50,6 +50,7 @@ class EndpointResponse(BaseModel):
     vcpu_count: int = Field(...)
     env: Dict[str, str] = Field(default_factory=dict)
     version: int = 0
+    status: str = Field(...)  # Deploying | Ready | Unhealthy
     created_at: datetime = Field(...)
     template: TemplateResponse
     executor: ExecutorResponse

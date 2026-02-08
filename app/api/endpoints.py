@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -8,6 +8,8 @@ from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 )
 from app.schemas.template import TemplateResponse
+from app.rabbitmq import publish_job_notification
+
 router = APIRouter(prefix="/endpoints", tags=["endpoints"])
 
 
@@ -49,6 +51,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         vcpu_count=endpoint.vcpu_count,
         env=endpoint.env or {},
         version=endpoint.version,
+        status=getattr(endpoint, "status", "Deploying"),
         created_at=endpoint.created_at,
         template=_format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),
@@ -58,6 +61,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
 
 @router.post("/", response_model=EndpointResponse, status_code=status.HTTP_200_OK)
 async def create_endpoint(
+    request: Request,
     endpoint_data: EndpointCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -67,6 +71,9 @@ async def create_endpoint(
     try:
         endpoint = svc_create(db, current_user.id, endpoint_data)
         endpoint = get_endpoint(db, endpoint.id, current_user.id)
+        conn = getattr(request.app.state, "rabbitmq", None)
+        if conn:
+            await publish_job_notification(conn, endpoint.executor_id)
         return _format_endpoint_response(endpoint)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -99,6 +106,7 @@ async def get_endpoint_route(
 
 @router.patch("/{id}", response_model=EndpointResponse)
 async def update_endpoint_route(
+    request: Request,
     id: int,
     endpoint_update: EndpointUpdate,
     current_user: User = Depends(get_current_active_user),
@@ -111,6 +119,9 @@ async def update_endpoint_route(
         if not updated:
             raise HTTPException(status_code=404, detail="Endpoint not found")
         updated = get_endpoint(db, id, current_user.id)
+        conn = getattr(request.app.state, "rabbitmq", None)
+        if conn:
+            await publish_job_notification(conn, updated.executor_id)
         return _format_endpoint_response(updated)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
