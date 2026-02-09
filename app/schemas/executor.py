@@ -1,6 +1,8 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 from pydantic import BaseModel
+
+EndpointStatus = Literal["DEPLOYING", "READY", "UNHEALTHY"]
 
 from app.schemas.template import TemplateResponse
 from app.schemas.job import JobResponse
@@ -32,12 +34,22 @@ class ExecutorJobUpdateRequest(BaseModel):
     status: Optional[str] = None
 
 
+class EndpointStatusUpdate(BaseModel):
+    """Executor-only: set endpoint status (READY, UNHEALTHY, DEPLOYING)"""
+    status: EndpointStatus
+
+
 class ExecutorSummary(BaseModel):
     id: int
     name: Optional[str] = None
     compute_type: Optional[str] = None
     is_active: bool
     created_at: datetime
+    gpu: Optional[str] = None
+    cpu: Optional[str] = None
+    ram: Optional[int] = None  # bytes
+    vram: Optional[int] = None  # bytes
+    last_heartbeat: Optional[datetime] = None
 
     class Config:
         from_attributes = True

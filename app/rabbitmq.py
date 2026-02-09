@@ -38,15 +38,26 @@ async def wait_for_executor_notification(
     """
     Block until an executor notification arrives (new job or endpoint) or timeout.
     Returns True if a message was received.
+    Uses consume() + event because basic_get returns immediately when queue is empty.
     """
     channel: AbstractChannel = await connection.channel()
     queue_name = _queue_name(executor_id)
     queue = await channel.declare_queue(queue_name, durable=False, auto_delete=True)
+    got_message: asyncio.Event = asyncio.Event()
+    received_message = False
+
+    async def on_message(message):
+        nonlocal received_message
+        await message.ack()
+        received_message = True
+        got_message.set()
+
+    consumer_tag = await queue.consume(on_message, no_ack=False)
     try:
-        message = await queue.get(timeout=timeout, fail=False)
-        if message:
-            await message.ack()
-            return True
+        await asyncio.wait_for(got_message.wait(), timeout=timeout)
+        return received_message
+    except asyncio.TimeoutError:
+        return False
     finally:
+        await queue.cancel(consumer_tag)
         await channel.close()
-    return False

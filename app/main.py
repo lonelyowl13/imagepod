@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -32,9 +32,11 @@ async def lifespan(app: FastAPI):
     if app.state.rabbitmq:
         await app.state.rabbitmq.close()
         print("RabbitMQ connection closed")
-    Base.metadata.drop_all(bind=engine)
-    print("Database tables nuked")
-    print("Shutting down ImagePod backend...")
+
+    if settings.test:
+        Base.metadata.drop_all(bind=engine)
+        print("Database tables nuked")
+        print("Shutting down ImagePod backend...")
 
 
 app = FastAPI(

@@ -17,6 +17,15 @@ run_app() {
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 }
 
+run_test() {
+  echo "running the app..."
+  source .venv/bin/activate
+
+  source .env
+  
+  TEST=true uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+}
+
 clean() {
   echo "Removing venv..."
   rm -rf ".venv"
@@ -30,11 +39,14 @@ case "$1" in
   run)
     run_app
     ;;
+  run_test)
+    run_test
+    ;;
   clean)
     clean
     ;;
   *)
-    echo "Usage: $0 {install|run|clean}"
+    echo "Usage: $0 {install|run|clean|run_test}"
     exit 1
     ;;
 esac

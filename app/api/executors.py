@@ -14,6 +14,7 @@ from app.schemas.executor import (
     ExecutorJobUpdateRequest,
     ExecutorSummary,
     ExecutorUpdatesResponse,
+    EndpointStatusUpdate,
 )
 from app.services.executor_service import (
     create_executor_with_key,
@@ -22,6 +23,7 @@ from app.services.executor_service import (
     get_endpoints_for_executor,
     get_executors_for_user,
 )
+from app.services.endpoint_service import update_endpoint_status_by_executor
 from app.rabbitmq import wait_for_executor_notification
 
 router = APIRouter(prefix="/executors", tags=["executors"])
@@ -126,9 +128,23 @@ def list_executor_endpoints(
         {
             "id": e.id,
             "name": e.name,
-            "status": getattr(e, "status", "Deploying"),
+            "status": getattr(e, "status", "DEPLOYING"),
             "template_id": e.template_id,
             "executor_id": e.executor_id,
         }
         for e in endpoints
     ]
+
+
+@router.patch("/endpoints/{endpoint_id}")
+def update_endpoint_status(
+    endpoint_id: int,
+    body: EndpointStatusUpdate,
+    executor: Executor = Depends(get_current_executor),
+    db: Session = Depends(get_db),
+):
+    """Update an endpoint's status (executor only; endpoint must belong to this executor)."""
+    updated = update_endpoint_status_by_executor(db, endpoint_id, executor.id, body.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    return {"detail": "ok", "id": updated.id, "status": updated.status}

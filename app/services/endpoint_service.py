@@ -83,3 +83,19 @@ def delete_endpoint(db: Session, endpoint_id: int, user_id: int) -> bool:
     db.delete(endpoint)
     db.commit()
     return True
+
+
+def update_endpoint_status_by_executor(
+    db: Session, endpoint_id: int, executor_id: int, status: str
+) -> Optional[Endpoint]:
+    """Update endpoint status; only allowed if endpoint belongs to this executor."""
+    endpoint = db.query(Endpoint).filter(
+        Endpoint.id == endpoint_id,
+        Endpoint.executor_id == executor_id,
+    ).first()
+    if not endpoint:
+        return None
+    endpoint.status = status
+    db.commit()
+    db.refresh(endpoint)
+    return endpoint

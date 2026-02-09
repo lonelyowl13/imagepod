@@ -5,14 +5,13 @@ import os
 
 class Settings(BaseSettings):
     
-    postgres_db: str = ""
+    postgres_db: str = "imagepod"
     postgres_user: str = ""
     postgres_password: str = ""
     postgres_host: str = "localhost"
     redis_password: str = ""
 
     redis_url: str = "redis://localhost:6379/0"
-    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
 
     rabbitmq_default_user: str = "imagepod"
     rabbitmq_default_pass: str = ""
@@ -28,8 +27,10 @@ class Settings(BaseSettings):
     kubeconfig_path: Optional[str] = None
     
     # Environment
-    environment: str = "development"
     debug: bool = True
+
+    # Test environment. If true, database tables gonna be nuked and recreated after each restart
+    test: bool = False
     
     class Config:
         env_file = ".env"
