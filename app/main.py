@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from app.config import settings
 from app.database import engine, Base
-from app.api import auth, jobs, endpoints, templates, executors
+from app.api import auth, jobs, endpoints, templates, executors, runpod
 from app.rabbitmq import connect as rabbitmq_connect
 
 
@@ -66,6 +66,7 @@ app.include_router(jobs.router)
 app.include_router(endpoints.router)
 app.include_router(templates.router)
 app.include_router(executors.router)
+app.include_router(runpod.router)
 
 
 @app.get("/")

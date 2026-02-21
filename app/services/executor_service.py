@@ -118,6 +118,23 @@ def get_endpoints_for_executor_by_status(
     )
 
 
+def get_endpoints_by_ids(
+    db: Session, executor_id: int, endpoint_ids: List[int]
+) -> List[Endpoint]:
+    """Return endpoints for this executor with the given ids, with template loaded."""
+    if not endpoint_ids:
+        return []
+    return (
+        db.query(Endpoint)
+        .options(joinedload(Endpoint.template))
+        .filter(
+            Endpoint.executor_id == executor_id,
+            Endpoint.id.in_(endpoint_ids),
+        )
+        .all()
+    )
+
+
 def get_executors_for_user(db: Session, user_id: int) -> List[Executor]:
     """Return all executors owned by the given user."""
     return db.query(Executor).filter(Executor.user_id == user_id).all()

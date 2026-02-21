@@ -11,7 +11,12 @@ from app.schemas.job import JobResponse
 from app.schemas.template import TemplateResponse
 from app.services.auth_service import verify_token, get_user_by_username
 from app.services.api_key_service import get_user_by_api_key
-from app.services.executor_service import get_endpoints_for_executor_by_status, get_executor_by_api_key, get_jobs_in_queue
+from app.services.executor_service import (
+    get_endpoints_for_executor_by_status,
+    get_endpoints_by_ids,
+    get_executor_by_api_key,
+    get_jobs_in_queue,
+)
 
 security = HTTPBearer()
 
@@ -27,9 +32,20 @@ def format_template_response(template) -> TemplateResponse:
 
 
 def build_updates_response(db: Session, executor_id: int) -> ExecutorUpdatesResponse:
-    """Build unified updates: jobs IN_QUEUE + endpoints with status Deploying."""
+    """Build unified updates: jobs IN_QUEUE + endpoints (Deploying + any endpoint that has jobs)."""
     jobs = get_jobs_in_queue(db, executor_id)
-    endpoints = get_endpoints_for_executor_by_status(db, executor_id, "Deploying")
+    deploying = get_endpoints_for_executor_by_status(db, executor_id, "Deploying")
+    deploying_ids = {e.id for e in deploying}
+    # Include endpoints that have queued jobs so the executor can start worker containers
+    job_endpoint_ids = list({j.endpoint_id for j in jobs} - deploying_ids)
+    endpoints_with_jobs = get_endpoints_by_ids(db, executor_id, job_endpoint_ids)
+    # Merge: Deploying first, then endpoints that have jobs (dedupe by id)
+    seen = set()
+    endpoints = []
+    for e in deploying + endpoints_with_jobs:
+        if e.id not in seen:
+            seen.add(e.id)
+            endpoints.append(e)
     return ExecutorUpdatesResponse(
         jobs=[
             JobResponse(

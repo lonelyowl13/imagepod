@@ -37,6 +37,7 @@ class EndpointUpdate(BaseModel):
     name: Optional[str] = None
     template_id: Optional[int] = None
     vcpu_count: Optional[int] = None
+    env: Optional[Dict[str, Any]] = None
 
 
 class EndpointResponse(BaseModel):
