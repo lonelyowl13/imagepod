@@ -26,4 +26,4 @@ class Endpoint(Base):
     user = relationship("User", back_populates="endpoints")
     template = relationship("Template", backref="endpoints")
     executor = relationship("Executor", back_populates="endpoints")
-    jobs = relationship("Job", back_populates="endpoint")
+    jobs = relationship("Job", back_populates="endpoint", cascade="all, delete-orphan")

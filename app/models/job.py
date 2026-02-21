@@ -12,7 +12,7 @@ class Job(Base):
     input_data = Column(JSON, nullable=False)
     output_data = Column(JSON)
     status = Column(String, default="IN_QUEUE")  # IN_QUEUE | RUNNING | COMPLETED | FAILED | CANCELLED | TIMED_OUT
-    endpoint_id = Column(Integer, ForeignKey("endpoints.id"), nullable=False)
+    endpoint_id = Column(Integer, ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False)
     executor_id = Column(Integer, ForeignKey("executors.id"), nullable=False)
 
     endpoint = relationship("Endpoint", back_populates="jobs")

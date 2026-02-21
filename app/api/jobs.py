@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -10,6 +12,7 @@ from app.services.job_service import (
     cancel_job,
 )
 from app.rabbitmq import publish_job_notification
+from app.redis_client import get_redis
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -40,10 +43,18 @@ async def get_job_status(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Get job status"""
+    """Get job status, including accumulated stream chunks when available."""
     job = get_job_by_endpoint(db, endpoint_id, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    stream = None
+    if job.status in ("RUNNING", "COMPLETED", "FAILED"):
+        r = get_redis()
+        raw_chunks = r.lrange(f"job:{job_id}:stream", 0, -1)
+        if raw_chunks:
+            stream = [json.loads(c) for c in raw_chunks]
+
     return JobResponse(
         id=job.id,
         delay_time=job.delay_time,
@@ -53,6 +64,7 @@ async def get_job_status(
         status=job.status,
         endpoint_id=job.endpoint_id,
         executor_id=job.executor_id,
+        stream=stream,
     )
 
 

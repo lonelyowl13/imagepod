@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 class JobRunRequest(BaseModel):
@@ -23,6 +23,7 @@ class JobResponse(BaseModel):
     status: str  # IN_QUEUE | RUNNING | COMPLETED | FAILED | CANCELLED | TIMED_OUT
     endpoint_id: int
     executor_id: int
+    stream: Optional[List[Any]] = None
 
     class Config:
         from_attributes = True

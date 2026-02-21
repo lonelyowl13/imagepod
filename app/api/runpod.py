@@ -12,6 +12,11 @@ from app.models.executor import Executor
 from app.models.endpoint import Endpoint
 from app.models.job import Job
 from app.services.executor_service import update_job_for_executor
+from app.redis_client import get_redis
+
+
+def _stream_key(job_id: int) -> str:
+    return f"job:{job_id}:stream"
 
 
 router = APIRouter(prefix="/runpod", tags=["runpod"])
@@ -211,6 +216,11 @@ async def job_done(
             detail="Job not found for this endpoint/executor",
         )
 
+    r = get_redis()
+    stream_key = _stream_key(job_id_int)
+    if r.exists(stream_key):
+        r.expire(stream_key, 300)
+
     return {"detail": "ok", "id": job.id, "status": job.status}
 
 
@@ -225,13 +235,55 @@ async def job_stream(
     """
     RunPod-compatible streaming results endpoint.
 
-    For now we accept and ignore the payload, but having this route prevents
-    streaming workers from failing. In the future this can be wired to a
-    streaming interface for clients.
+    The RunPod SDK POSTs a JSON body with {"output": <chunk>} for each
+    intermediate result. Chunks are buffered in Redis so clients can poll
+    for accumulated stream data via the job status endpoint.
     """
-    _ = pod_id, job_id, executor, db  # noqa: F841
-    _ = await request.body()  # Read and discard
-    return {"detail": "ok", "stream": "ignored"}
+    if not job_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing job_id in query parameters",
+        )
+
+    raw_body = await request.body()
+    try:
+        body = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid stream payload",
+        )
+
+    endpoint = _get_endpoint_for_pod(db, pod_id, executor)
+
+    try:
+        job_id_int = int(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid job_id",
+        )
+
+    job = (
+        db.query(Job)
+        .filter(
+            Job.id == job_id_int,
+            Job.executor_id == executor.id,
+            Job.endpoint_id == endpoint.id,
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found for this endpoint/executor",
+        )
+
+    chunk = body.get("output")
+    r = get_redis()
+    r.rpush(_stream_key(job_id_int), json.dumps(chunk))
+
+    return {"detail": "ok"}
 
 
 @router.get("/ping/{pod_id}")

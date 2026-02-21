@@ -69,6 +69,9 @@ def update_endpoint(
         if not executor:
             raise ValueError("Executor not found")
     payload = data.model_dump(exclude_unset=True, by_alias=False)
+
+    endpoint.version += 1
+
     for k, v in payload.items():
         setattr(endpoint, k, v)
     db.commit()
