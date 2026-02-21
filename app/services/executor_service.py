@@ -1,27 +1,16 @@
-import hashlib
-import secrets
-import string
 from typing import Optional, List, Tuple
 
 from sqlalchemy.orm import Session, joinedload
 from app.models.executor import Executor
 from app.models.job import Job
 from app.models.endpoint import Endpoint
-
-
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
-
-
-def _generate_api_key() -> str:
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(32))
+from app.utils import hash_key, generate_api_key
 
 
 def create_executor_with_key(db: Session, user_id: int, name: str) -> Optional[Tuple[Executor, str]]:
     """Create executor and return (executor, raw_api_key)."""
-    raw_key = _generate_api_key()
-    key_hash = _hash_key(raw_key)
+    raw_key = generate_api_key()
+    key_hash = hash_key(raw_key)
     executor = Executor(name=name, token_hash=key_hash, user_id=user_id)
     db.add(executor)
     db.commit()
@@ -30,7 +19,7 @@ def create_executor_with_key(db: Session, user_id: int, name: str) -> Optional[T
 
 
 def get_executor_by_api_key(db: Session, api_key: str) -> Optional[Executor]:
-    key_hash = _hash_key(api_key)
+    key_hash = hash_key(api_key)
     return db.query(Executor).filter(Executor.token_hash == key_hash).first()
 
 

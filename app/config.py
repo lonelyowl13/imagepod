@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
-import os
 
 
 class Settings(BaseSettings):
@@ -18,7 +17,7 @@ class Settings(BaseSettings):
     rabbitmq_host: str = "localhost"
 
     # Security
-    secret_key: str = os.getenv("SECRET_KEY")
+    secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -27,6 +26,7 @@ class Settings(BaseSettings):
     kubeconfig_path: Optional[str] = None
     
     # Environment
+    environment: str = "development"
     debug: bool = True
 
     # Test environment. If true, database tables gonna be nuked and recreated after each restart

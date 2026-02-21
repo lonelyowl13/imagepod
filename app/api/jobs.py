@@ -68,7 +68,7 @@ async def get_job_status(
     )
 
 
-@router.get("/{endpoint_id}/cancel/{job_id}", response_model=JobResponse)
+@router.post("/{endpoint_id}/cancel/{job_id}", response_model=JobResponse)
 async def cancel_job_route(
     endpoint_id: int,
     job_id: int,
@@ -79,7 +79,7 @@ async def cancel_job_route(
     job = get_job_by_endpoint(db, endpoint_id, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    cancelled = cancel_job(db, job_id, current_user.id)
+    cancelled = cancel_job(db, job_id)
     if not cancelled:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobResponse(

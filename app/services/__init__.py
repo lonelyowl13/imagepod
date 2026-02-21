@@ -1,6 +1,8 @@
-from .user_service import UserService
+from .user_service import create_user, get_user_by_id, get_user_by_username
 
 
 __all__ = [
-    "UserService",
+    "create_user",
+    "get_user_by_id",
+    "get_user_by_username",
 ]

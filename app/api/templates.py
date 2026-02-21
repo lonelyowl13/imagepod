@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.api.helpers import get_current_active_user
+from app.api.helpers import format_template_response, get_current_active_user
 from app.models.user import User
 from app.schemas.template import TemplateCreate, TemplateUpdate, TemplateResponse
 from app.services.template_service import (
@@ -18,17 +18,6 @@ from app.services.template_service import (
 router = APIRouter(prefix="/templates", tags=["templates"])
 
 
-def _to_response(t) -> TemplateResponse:
-    return TemplateResponse(
-        id=t.id,
-        name=t.name,
-        image_name=t.image_name,
-        docker_entrypoint=t.docker_entrypoint or [],
-        docker_start_cmd=t.docker_start_cmd or [],
-        env=t.env or {},
-    )
-
-
 @router.post("/", response_model=TemplateResponse, status_code=status.HTTP_200_OK)
 async def create_template_route(
     body: TemplateCreate,
@@ -37,7 +26,7 @@ async def create_template_route(
 ):
     """Create a new template."""
     t = create_template(db, current_user.id, body)
-    return _to_response(t)
+    return format_template_response(t)
 
 
 @router.get("/", response_model=List[TemplateResponse])
@@ -47,7 +36,7 @@ async def list_templates(
 ):
     """List current user's templates."""
     templates = get_user_templates(db, current_user.id)
-    return [_to_response(t) for t in templates]
+    return [format_template_response(t) for t in templates]
 
 
 @router.get("/{id}", response_model=TemplateResponse)
@@ -60,7 +49,7 @@ async def get_template_route(
     t = get_template(db, id, current_user.id)
     if not t:
         raise HTTPException(status_code=404, detail="Template not found")
-    return _to_response(t)
+    return format_template_response(t)
 
 
 @router.patch("/{id}", response_model=TemplateResponse)
@@ -74,7 +63,7 @@ async def update_template_route(
     t = update_template(db, id, current_user.id, body)
     if not t:
         raise HTTPException(status_code=404, detail="Template not found")
-    return _to_response(t)
+    return format_template_response(t)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

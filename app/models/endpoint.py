@@ -12,7 +12,7 @@ class Endpoint(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     template_id = Column(Integer, ForeignKey("templates.id"), nullable=False)
-    executor_id = Column(Integer, ForeignKey("executors.id"), nullable=False)
+    executor_id = Column(Integer, ForeignKey("executors.id"), nullable=False, index=True)
 
     compute_type = Column(String, default="GPU")
     execution_timeout_ms = Column(Integer, default=600000)

@@ -2,31 +2,24 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.api.helpers import get_current_active_user
+from app.api.helpers import format_template_response, get_current_active_user
 from app.models.user import User
 from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 )
-from app.schemas.template import TemplateResponse
 from app.rabbitmq import publish_job_notification
+from app.services.endpoint_service import (
+    create_endpoint as svc_create,
+    get_endpoint,
+    get_user_endpoints,
+    update_endpoint,
+    delete_endpoint,
+)
 
 router = APIRouter(prefix="/endpoints", tags=["endpoints"])
 
 
-def _format_template_response(template) -> TemplateResponse:
-    """Format template for endpoint response"""
-    return TemplateResponse(
-        id=template.id,
-        name=template.name,
-        image_name=template.image_name,
-        docker_entrypoint=template.docker_entrypoint or [],
-        docker_start_cmd=template.docker_start_cmd or [],
-        env=template.env or {},
-    )
-
-
 def _format_executor_response(executor) -> ExecutorResponse:
-    """Format executor for endpoint response"""
     return ExecutorResponse(
         id=executor.id,
         name=executor.name,
@@ -39,7 +32,6 @@ def _format_executor_response(executor) -> ExecutorResponse:
 
 
 def _format_endpoint_response(endpoint) -> EndpointResponse:
-    """Format endpoint for response"""
     return EndpointResponse(
         id=endpoint.id,
         name=endpoint.name,
@@ -53,21 +45,20 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         version=endpoint.version,
         status=getattr(endpoint, "status", "Deploying"),
         created_at=endpoint.created_at,
-        template=_format_template_response(endpoint.template),
+        template=format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),
         user_id=endpoint.user_id,
     )
 
 
 @router.post("/", response_model=EndpointResponse, status_code=status.HTTP_200_OK)
-async def create_endpoint(
+async def create_endpoint_route(
     request: Request,
     endpoint_data: EndpointCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Create an endpoint from template"""
-    from app.services.endpoint_service import create_endpoint as svc_create, get_endpoint
     try:
         endpoint = svc_create(db, current_user.id, endpoint_data)
         endpoint = get_endpoint(db, endpoint.id, current_user.id)
@@ -85,7 +76,6 @@ async def list_endpoints(
     db: Session = Depends(get_db),
 ):
     """List user endpoints"""
-    from app.services.endpoint_service import get_user_endpoints
     endpoints = get_user_endpoints(db, current_user.id)
     return [_format_endpoint_response(e) for e in endpoints]
 
@@ -97,7 +87,6 @@ async def get_endpoint_route(
     db: Session = Depends(get_db),
 ):
     """Get a specific endpoint"""
-    from app.services.endpoint_service import get_endpoint
     endpoint = get_endpoint(db, id, current_user.id)
     if not endpoint:
         raise HTTPException(status_code=404, detail="Endpoint not found")
@@ -113,7 +102,6 @@ async def update_endpoint_route(
     db: Session = Depends(get_db),
 ):
     """Update an endpoint"""
-    from app.services.endpoint_service import update_endpoint, get_endpoint
     try:
         updated = update_endpoint(db, id, endpoint_update, current_user.id)
         if not updated:
@@ -134,8 +122,6 @@ async def delete_endpoint_route(
     db: Session = Depends(get_db),
 ):
     """Delete an endpoint"""
-    from app.services.endpoint_service import delete_endpoint
     if not delete_endpoint(db, id, current_user.id):
         raise HTTPException(status_code=404, detail="Endpoint not found")
     return {"message": "Endpoint deleted successfully"}
-

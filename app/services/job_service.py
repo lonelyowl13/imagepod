@@ -45,7 +45,7 @@ def get_job_by_endpoint(
     return job
 
 
-def cancel_job(db: Session, job_id: int, user_id: Optional[int] = None) -> Optional[Job]:
+def cancel_job(db: Session, job_id: int) -> Optional[Job]:
     job = get_job(db, job_id)
     if not job:
         return None

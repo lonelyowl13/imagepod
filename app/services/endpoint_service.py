@@ -14,6 +14,8 @@ def create_endpoint(db: Session, user_id: int, data: EndpointCreate) -> Endpoint
     executor = db.query(Executor).filter(Executor.id == data.executor_id).first()
     if not executor:
         raise ValueError("Executor not found")
+    if executor.user_id != user_id:
+        raise ValueError("Executor not found")
     env = template.env.copy() if template.env else {}
     endpoint = Endpoint(
         user_id=user_id,
@@ -69,6 +71,7 @@ def update_endpoint(
         if not executor:
             raise ValueError("Executor not found")
     payload = data.model_dump(exclude_unset=True, by_alias=False)
+    payload.pop("version", None)
 
     endpoint.version += 1
 

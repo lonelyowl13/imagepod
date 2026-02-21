@@ -56,7 +56,6 @@ def _serialize_job_for_runpod(job: Job) -> dict:
 @router.get("/job-take/{pod_id}")
 async def job_take_single(
     pod_id: int,
-    request: Request,
     batch_size: Optional[int] = None,
     job_in_progress: Optional[str] = "0",
     executor: Executor = Depends(get_current_executor),
@@ -70,11 +69,9 @@ async def job_take_single(
       - 204 No Content when there is no work
       - A JSON object with at least {id, input} describing the job
     """
-    # If the SDK requested batch mode, delegate to the batch handler.
     if batch_size and batch_size > 1:
         return await job_take_batch(
             pod_id=pod_id,
-            request=request,
             batch_size=batch_size,
             job_in_progress=job_in_progress,
             executor=executor,
@@ -111,7 +108,6 @@ async def job_take_single(
 @router.get("/job-take-batch/{pod_id}")
 async def job_take_batch(
     pod_id: int,
-    request: Request,
     batch_size: int = 1,
     job_in_progress: Optional[str] = "0",
     executor: Executor = Depends(get_current_executor),
@@ -165,9 +161,9 @@ async def job_done(
       - output: arbitrary JSON-serializable data
       - error: optional error payload
       - stopPod: optional boolean flag
-    """
-    _ = isStream  # We currently don't differentiate streaming vs final here.
 
+    isStream and request are kept for RunPod SDK compatibility.
+    """
     raw_body = await request.body()
     try:
         job_data = json.loads(raw_body.decode("utf-8"))
@@ -196,6 +192,21 @@ async def job_done(
             detail="Invalid job_id",
         )
 
+    job = (
+        db.query(Job)
+        .filter(
+            Job.id == job_id_int,
+            Job.executor_id == executor.id,
+            Job.endpoint_id == endpoint.id,
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found for this endpoint/executor",
+        )
+
     status_value = "COMPLETED"
     if "error" in job_data and job_data["error"]:
         status_value = "FAILED"
@@ -209,12 +220,6 @@ async def job_done(
         status=status_value,
         output_data=output_data,
     )
-
-    if not job or job.endpoint_id != endpoint.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found for this endpoint/executor",
-        )
 
     r = get_redis()
     stream_key = _stream_key(job_id_int)

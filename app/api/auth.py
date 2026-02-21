@@ -20,7 +20,7 @@ from app.schemas.user import (
     Token,
     RefreshRequest,
 )
-from app.services.user_service import UserService
+from app.services.user_service import create_user, get_user_by_username
 from app.services.api_key_service import (
     create_api_key as create_api_key_record,
     delete_api_key,
@@ -35,9 +35,8 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 @router.post("/register", response_model=UserResponse)
 async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user. Body: username, password, password2."""
-    user_service = UserService(db)
     try:
-        user = user_service.create_user(body.username, body.password)
+        user = create_user(db, body.username, body.password)
         return UserResponse.model_validate(user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -75,8 +74,7 @@ async def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user_service = UserService(db)
-    user = user_service.get_user_by_username(username)
+    user = get_user_by_username(db, username)
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -106,7 +104,7 @@ async def list_api_keys(
 
 
 
-@router.get("/key", response_model=ApiKey)
+@router.post("/key", response_model=ApiKey)
 async def create_api_key(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -129,4 +127,4 @@ async def delete_api_key_route(
     """Delete an API key by id. Key must belong to the current user."""
     if not delete_api_key(db, current_user.id, key_id):
         raise HTTPException(status_code=404, detail="API key not found")
-    return "API key deleted"
+    return {"detail": "API key deleted"}

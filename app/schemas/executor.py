@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 from pydantic import BaseModel
 
-EndpointStatus = Literal["DEPLOYING", "READY", "UNHEALTHY"]
+EndpointStatus = Literal["Deploying", "Ready", "Unhealthy"]
 
 from app.schemas.template import TemplateResponse
 from app.schemas.job import JobResponse

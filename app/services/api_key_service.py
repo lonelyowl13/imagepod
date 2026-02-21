@@ -1,20 +1,9 @@
-import hashlib
-import secrets
-import string
 from typing import Optional, List, Tuple
 
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.api_key import ApiKey
-
-
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
-
-
-def _generate_api_key() -> str:
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(32))
+from app.utils import hash_key, generate_api_key
 
 
 def create_api_key(db: Session, user_id: int) -> Optional[Tuple[int, str]]:
@@ -22,8 +11,8 @@ def create_api_key(db: Session, user_id: int) -> Optional[Tuple[int, str]]:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return None
-    raw_key = _generate_api_key()
-    key_hash = _hash_key(raw_key)
+    raw_key = generate_api_key()
+    key_hash = hash_key(raw_key)
     row = ApiKey(user_id=user_id, key_hash=key_hash)
     db.add(row)
     db.commit()
@@ -43,7 +32,7 @@ def delete_api_key(db: Session, user_id: int, key_id: int) -> bool:
 
 def get_user_by_api_key(db: Session, api_key: str) -> Optional[User]:
     """Resolve user from API key (lookup by hash)."""
-    key_hash = _hash_key(api_key)
+    key_hash = hash_key(api_key)
     row = db.query(ApiKey).filter(ApiKey.key_hash == key_hash).first()
     if not row:
         return None
