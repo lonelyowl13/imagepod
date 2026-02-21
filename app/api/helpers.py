@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.enums import EndpointStatus
 from app.models.user import User
 from app.schemas.executor import EndpointUpdateItem, ExecutorUpdatesResponse
 from app.schemas.job import JobResponse
@@ -34,7 +35,7 @@ def format_template_response(template) -> TemplateResponse:
 def build_updates_response(db: Session, executor_id: int) -> ExecutorUpdatesResponse:
     """Build unified updates: jobs IN_QUEUE + endpoints (Deploying + any endpoint that has jobs)."""
     jobs = get_jobs_in_queue(db, executor_id)
-    deploying = get_endpoints_for_executor_by_status(db, executor_id, "Deploying")
+    deploying = get_endpoints_for_executor_by_status(db, executor_id, EndpointStatus.DEPLOYING)
     deploying_ids = {e.id for e in deploying}
     # Include endpoints that have queued jobs so the executor can start worker containers
     job_endpoint_ids = list({j.endpoint_id for j in jobs} - deploying_ids)

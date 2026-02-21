@@ -150,7 +150,7 @@ def test_process_job(base_url, tokens, executor):
 
     # set endpoint status to "ready"
     r = requests.patch(f"{base_url}/executors/endpoints/{endpoint["id"]}", headers=executor_headers, 
-    json={"status": "READY"})
+    json={"status": "Ready"})
 
     assert r.status_code == 200, r.text
 

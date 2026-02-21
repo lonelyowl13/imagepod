@@ -1,9 +1,8 @@
-from typing import Optional, Dict, Any, List, Literal
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel
 
-EndpointStatus = Literal["Deploying", "Ready", "Unhealthy"]
-
+from app.enums import EndpointStatus, JobStatus
 from app.schemas.template import TemplateResponse
 from app.schemas.job import JobResponse
 
@@ -31,11 +30,11 @@ class ExecutorJobUpdateRequest(BaseModel):
     delay_time: Optional[int] = None
     execution_time: Optional[int] = None
     output_data: Optional[Dict[str, Any]] = None
-    status: Optional[str] = None
+    status: Optional[JobStatus] = None
 
 
 class EndpointStatusUpdate(BaseModel):
-    """Executor-only: set endpoint status (READY, UNHEALTHY, DEPLOYING)"""
+    """Executor-only: set endpoint status (Ready, Unhealthy, Deploying)"""
     status: EndpointStatus
 
 
@@ -59,7 +58,7 @@ class EndpointUpdateItem(BaseModel):
     """Endpoint summary for executor updates (e.g. status=Deploying)."""
     id: int
     name: str
-    status: str
+    status: EndpointStatus
     template_id: int
     executor_id: int
     template: TemplateResponse

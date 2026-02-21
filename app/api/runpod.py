@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.enums import JobStatus
 from app.api.helpers import get_current_executor
 from app.models.executor import Executor
 from app.models.endpoint import Endpoint
@@ -87,18 +88,16 @@ async def job_take_single(
         .filter(
             Job.endpoint_id == endpoint.id,
             Job.executor_id == executor.id,
-            Job.status == "IN_QUEUE",
+            Job.status == JobStatus.IN_QUEUE,
         )
         .order_by(Job.id.asc())
         .first()
     )
 
     if not job:
-        # RunPod expects 204 when there is no work.
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    # Mark job as RUNNING as soon as it is handed to the worker.
-    job.status = "RUNNING"
+    job.status = JobStatus.RUNNING
     db.commit()
     db.refresh(job)
 
@@ -127,7 +126,7 @@ async def job_take_batch(
         .filter(
             Job.endpoint_id == endpoint.id,
             Job.executor_id == executor.id,
-            Job.status == "IN_QUEUE",
+            Job.status == JobStatus.IN_QUEUE,
         )
         .order_by(Job.id.asc())
         .limit(limit)
@@ -137,9 +136,8 @@ async def job_take_batch(
     if not jobs:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    # Mark all as RUNNING.
     for job in jobs:
-        job.status = "RUNNING"
+        job.status = JobStatus.RUNNING
     db.commit()
 
     return [_serialize_job_for_runpod(job) for job in jobs]
@@ -207,9 +205,9 @@ async def job_done(
             detail="Job not found for this endpoint/executor",
         )
 
-    status_value = "COMPLETED"
+    status_value = JobStatus.COMPLETED
     if "error" in job_data and job_data["error"]:
-        status_value = "FAILED"
+        status_value = JobStatus.FAILED
 
     output_data = job_data.get("output")
 

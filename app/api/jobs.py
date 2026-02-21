@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.enums import JobStatus
 from app.api.helpers import get_current_active_user
 from app.models.user import User
 from app.schemas.job import JobResponse, JobRunRequest, JobRunResponse
@@ -31,7 +32,7 @@ async def run_job(
         conn = getattr(request.app.state, "rabbitmq", None)
         if conn:
             await publish_job_notification(conn, job.executor_id)
-        return JobRunResponse(id=job.id, status="IN_QUEUE")
+        return JobRunResponse(id=job.id, status=JobStatus.IN_QUEUE)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -49,7 +50,7 @@ async def get_job_status(
         raise HTTPException(status_code=404, detail="Job not found")
 
     stream = None
-    if job.status in ("RUNNING", "COMPLETED", "FAILED"):
+    if job.status in (JobStatus.RUNNING, JobStatus.COMPLETED, JobStatus.FAILED):
         r = get_redis()
         raw_chunks = r.lrange(f"job:{job_id}:stream", 0, -1)
         if raw_chunks:

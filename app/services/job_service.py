@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
+from app.enums import JobStatus
 from app.models.job import Job
 from app.models.endpoint import Endpoint
 from app.schemas.job import JobStatusUpdate
@@ -15,7 +16,7 @@ def create_job_for_endpoint(
         raise ValueError("Endpoint not found")
     job = Job(
         input_data=input_data,
-        status="IN_QUEUE",
+        status=JobStatus.IN_QUEUE,
         delay_time=0,
         execution_time=0,
         endpoint_id=endpoint.id,
@@ -49,8 +50,8 @@ def cancel_job(db: Session, job_id: int) -> Optional[Job]:
     job = get_job(db, job_id)
     if not job:
         return None
-    if job.status in ("IN_QUEUE", "RUNNING"):
-        job.status = "CANCELLED"
+    if job.status in (JobStatus.IN_QUEUE, JobStatus.RUNNING):
+        job.status = JobStatus.CANCELLED
         db.commit()
         db.refresh(job)
     return job

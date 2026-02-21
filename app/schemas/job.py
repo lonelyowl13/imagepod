@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
+from app.enums import JobStatus
 
 
 class JobRunRequest(BaseModel):
@@ -10,7 +11,7 @@ class JobRunRequest(BaseModel):
 class JobRunResponse(BaseModel):
     """Response for POST /jobs/{id}/run"""
     id: int
-    status: str  # "IN_QUEUE"
+    status: JobStatus
 
 
 class JobResponse(BaseModel):
@@ -20,7 +21,7 @@ class JobResponse(BaseModel):
     execution_time: int
     output: Optional[Dict[str, Any]] = None
     input: Dict[str, Any]
-    status: str  # IN_QUEUE | RUNNING | COMPLETED | FAILED | CANCELLED | TIMED_OUT
+    status: JobStatus
     endpoint_id: int
     executor_id: int
     stream: Optional[List[Any]] = None
@@ -31,6 +32,6 @@ class JobResponse(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     """Used by external workers to update job status"""
-    status: str
+    status: JobStatus
     output_data: Optional[Dict[str, Any]] = None
     execution_time: Optional[int] = None  # milliseconds

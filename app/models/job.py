@@ -2,6 +2,7 @@ from sqlalchemy import Column, DateTime, Index, Integer, String, ForeignKey, JSO
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.enums import JobStatus
 
 
 class Job(Base):
@@ -15,7 +16,7 @@ class Job(Base):
     execution_time = Column(Integer, default=0)  # milliseconds
     input_data = Column(JSON, nullable=False)
     output_data = Column(JSON)
-    status = Column(String, default="IN_QUEUE", index=True)  # IN_QUEUE | RUNNING | COMPLETED | FAILED | CANCELLED | TIMED_OUT
+    status = Column(String, default=JobStatus.IN_QUEUE, index=True)
     endpoint_id = Column(Integer, ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False)
     executor_id = Column(Integer, ForeignKey("executors.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

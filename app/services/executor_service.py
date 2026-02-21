@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple
 
 from sqlalchemy.orm import Session, joinedload
+from app.enums import JobStatus
 from app.models.executor import Executor
 from app.models.job import Job
 from app.models.endpoint import Endpoint
@@ -60,7 +61,7 @@ def update_executor_spec(
 def get_jobs_in_queue(db: Session, executor_id: int) -> List[Job]:
     return (
         db.query(Job)
-        .filter(Job.executor_id == executor_id, Job.status == "IN_QUEUE")
+        .filter(Job.executor_id == executor_id, Job.status == JobStatus.IN_QUEUE)
         .all()
     )
 

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.enums import EndpointStatus
 from app.api.helpers import build_updates_response, get_current_executor, get_current_active_user
 from app.models.executor import Executor
 from app.models.user import User
@@ -128,7 +129,7 @@ def list_executor_endpoints(
         {
             "id": e.id,
             "name": e.name,
-            "status": getattr(e, "status", "DEPLOYING"),
+            "status": getattr(e, "status", EndpointStatus.DEPLOYING),
             "template_id": e.template_id,
             "executor_id": e.executor_id,
         }

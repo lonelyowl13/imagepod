@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
+from app.enums import EndpointStatus
 from app.api.helpers import format_template_response, get_current_active_user
 from app.models.user import User
 from app.schemas.endpoint import (
@@ -43,7 +44,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         vcpu_count=endpoint.vcpu_count,
         env=endpoint.env or {},
         version=endpoint.version,
-        status=getattr(endpoint, "status", "Deploying"),
+        status=getattr(endpoint, "status", EndpointStatus.DEPLOYING),
         created_at=endpoint.created_at,
         template=format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),

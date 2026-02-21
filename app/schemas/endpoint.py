@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
+from app.enums import EndpointStatus
 from app.schemas.template import TemplateResponse
 
 
@@ -51,7 +52,7 @@ class EndpointResponse(BaseModel):
     vcpu_count: int = Field(...)
     env: Dict[str, str] = Field(default_factory=dict)
     version: int = 0
-    status: str = Field(...)  # Deploying | Ready | Unhealthy
+    status: EndpointStatus = Field(...)
     created_at: datetime = Field(...)
     template: TemplateResponse
     executor: ExecutorResponse

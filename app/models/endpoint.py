@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.enums import EndpointStatus
 
 
 class Endpoint(Base):
@@ -20,7 +21,7 @@ class Endpoint(Base):
     vcpu_count = Column(Integer, default=2)
     env = Column(JSON)  # env vars (can override template)
     version = Column(Integer, default=0)
-    status = Column(String, default="Deploying", server_default="Deploying")  # Deploying | Ready | Unhealthy
+    status = Column(String, default=EndpointStatus.DEPLOYING, server_default=EndpointStatus.DEPLOYING.value)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="endpoints")
