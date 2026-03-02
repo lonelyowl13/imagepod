@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     redis_password: str = ""
 
-    redis_url: str = "redis://localhost:6379/0"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_host: str = "localhost"
 
     rabbitmq_default_user: str = "imagepod"
     rabbitmq_default_pass: str = ""
@@ -44,6 +46,9 @@ class Settings(BaseSettings):
         rabbitmq_url: str = f"amqp://{self.rabbitmq_default_user}:{self.rabbitmq_default_pass}@{self.rabbitmq_host}:5672/"
 
         return rabbitmq_url
+
+    def get_redis_url(self):
+        return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/0"
 
 
 settings = Settings()

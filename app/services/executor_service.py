@@ -5,6 +5,7 @@ from app.enums import JobStatus
 from app.models.executor import Executor
 from app.models.job import Job
 from app.models.endpoint import Endpoint
+from app.models.volume import EndpointVolume
 from app.utils import hash_key, generate_api_key
 
 
@@ -99,10 +100,13 @@ def get_endpoints_for_executor(db: Session, executor_id: int) -> List[Endpoint]:
 def get_endpoints_for_executor_by_status(
     db: Session, executor_id: int, status: str
 ) -> List[Endpoint]:
-    """Return endpoints for this executor with the given status (e.g. 'Deploying'), with template loaded."""
+    """Return endpoints for this executor with the given status (e.g. 'Deploying'), with template and volumes loaded."""
     return (
         db.query(Endpoint)
-        .options(joinedload(Endpoint.template))
+        .options(
+            joinedload(Endpoint.template),
+            joinedload(Endpoint.volume_mounts).joinedload(EndpointVolume.volume),
+        )
         .filter(Endpoint.executor_id == executor_id, Endpoint.status == status)
         .all()
     )
@@ -111,12 +115,15 @@ def get_endpoints_for_executor_by_status(
 def get_endpoints_by_ids(
     db: Session, executor_id: int, endpoint_ids: List[int]
 ) -> List[Endpoint]:
-    """Return endpoints for this executor with the given ids, with template loaded."""
+    """Return endpoints for this executor with the given ids, with template and volumes loaded."""
     if not endpoint_ids:
         return []
     return (
         db.query(Endpoint)
-        .options(joinedload(Endpoint.template))
+        .options(
+            joinedload(Endpoint.template),
+            joinedload(Endpoint.volume_mounts).joinedload(EndpointVolume.volume),
+        )
         .filter(
             Endpoint.executor_id == executor_id,
             Endpoint.id.in_(endpoint_ids),

@@ -34,4 +34,5 @@ class Executor(Base):
     
     # Relationships
     endpoints = relationship("Endpoint", back_populates="executor")
+    volumes = relationship("Volume", back_populates="executor", cascade="all, delete-orphan")
     user = relationship("User", back_populates="executors")

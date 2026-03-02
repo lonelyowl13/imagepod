@@ -4,6 +4,7 @@ from .job import Job
 from .endpoint import Endpoint
 from .template import Template
 from .executor import Executor
+from .volume import Volume, EndpointVolume
 
 __all__ = [
     "User",
@@ -12,4 +13,6 @@ __all__ = [
     "Endpoint",
     "Template",
     "Executor",
+    "Volume",
+    "EndpointVolume",
 ]

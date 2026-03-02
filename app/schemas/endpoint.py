@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from app.enums import EndpointStatus
 from app.schemas.template import TemplateResponse
+from app.schemas.volume import EndpointVolumeInfo
 
 
 class ExecutorResponse(BaseModel):
@@ -56,6 +57,7 @@ class EndpointResponse(BaseModel):
     created_at: datetime = Field(...)
     template: TemplateResponse
     executor: ExecutorResponse
+    volumes: List[EndpointVolumeInfo] = Field(default_factory=list)
     user_id: int = Field(...)
 
     class Config:

@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 )
+from app.schemas.volume import EndpointVolumeInfo
 from app.rabbitmq import publish_job_notification
 from app.services.endpoint_service import (
     create_endpoint as svc_create,
@@ -32,6 +33,19 @@ def _format_executor_response(executor) -> ExecutorResponse:
     )
 
 
+def _format_volume_mounts(endpoint) -> list:
+    mounts = getattr(endpoint, "volume_mounts", None) or []
+    return [
+        EndpointVolumeInfo(
+            volume_id=m.volume_id,
+            name=m.volume.name,
+            mount_path=m.mount_path,
+            size_gb=m.volume.size_gb,
+        )
+        for m in mounts
+    ]
+
+
 def _format_endpoint_response(endpoint) -> EndpointResponse:
     return EndpointResponse(
         id=endpoint.id,
@@ -48,6 +62,7 @@ def _format_endpoint_response(endpoint) -> EndpointResponse:
         created_at=endpoint.created_at,
         template=format_template_response(endpoint.template),
         executor=_format_executor_response(endpoint.executor),
+        volumes=_format_volume_mounts(endpoint),
         user_id=endpoint.user_id,
     )
 

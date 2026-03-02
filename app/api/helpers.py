@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.executor import EndpointUpdateItem, ExecutorUpdatesResponse
 from app.schemas.job import JobResponse
 from app.schemas.template import TemplateResponse
+from app.schemas.volume import EndpointVolumeInfo
 from app.services.auth_service import verify_token, get_user_by_username
 from app.services.api_key_service import get_user_by_api_key
 from app.services.executor_service import (
@@ -71,6 +72,15 @@ def build_updates_response(db: Session, executor_id: int) -> ExecutorUpdatesResp
                 template=format_template_response(e.template),
                 env=e.env or {},
                 version=e.version,
+                volumes=[
+                    EndpointVolumeInfo(
+                        volume_id=m.volume_id,
+                        name=m.volume.name,
+                        mount_path=m.mount_path,
+                        size_gb=m.volume.size_gb,
+                    )
+                    for m in (getattr(e, "volume_mounts", None) or [])
+                ],
             )
             for e in endpoints
         ],

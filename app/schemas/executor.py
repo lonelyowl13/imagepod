@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from app.enums import EndpointStatus, JobStatus
 from app.schemas.template import TemplateResponse
+from app.schemas.volume import EndpointVolumeInfo
 from app.schemas.job import JobResponse
 
 
@@ -64,6 +65,7 @@ class EndpointUpdateItem(BaseModel):
     template: TemplateResponse
     env: Dict[str, Any]
     version: int
+    volumes: List[EndpointVolumeInfo] = []
 
     class Config:
         from_attributes = True

@@ -28,3 +28,4 @@ class Endpoint(Base):
     template = relationship("Template", backref="endpoints")
     executor = relationship("Executor", back_populates="endpoints")
     jobs = relationship("Job", back_populates="endpoint", cascade="all, delete-orphan")
+    volume_mounts = relationship("EndpointVolume", back_populates="endpoint", cascade="all, delete-orphan")

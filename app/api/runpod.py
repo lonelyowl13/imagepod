@@ -14,6 +14,9 @@ from app.models.endpoint import Endpoint
 from app.models.job import Job
 from app.services.executor_service import update_job_for_executor
 from app.redis_client import get_redis
+from app.rabbitmq import wait_for_executor_notification
+
+LONG_POLL_TIMEOUT = 15.0
 
 
 def _stream_key(job_id: int) -> str:
@@ -54,8 +57,22 @@ def _serialize_job_for_runpod(job: Job) -> dict:
     }
 
 
+def _take_next_job(db: Session, endpoint_id: int, executor_id: int) -> Optional[Job]:
+    return (
+        db.query(Job)
+        .filter(
+            Job.endpoint_id == endpoint_id,
+            Job.executor_id == executor_id,
+            Job.status == JobStatus.IN_QUEUE,
+        )
+        .order_by(Job.id.asc())
+        .first()
+    )
+
+
 @router.get("/job-take/{pod_id}")
 async def job_take_single(
+    request: Request,
     pod_id: int,
     batch_size: Optional[int] = None,
     job_in_progress: Optional[str] = "0",
@@ -63,15 +80,15 @@ async def job_take_single(
     db: Session = Depends(get_db),
 ):
     """
-    RunPod-compatible single job-take endpoint.
+    RunPod-compatible single job-take endpoint with long-polling.
 
-    The RunPod SDK calls RUNPOD_WEBHOOK_GET_JOB (with $ID already substituted
-    for the worker id), and this handler returns either:
-      - 204 No Content when there is no work
-      - A JSON object with at least {id, input} describing the job
+    Holds the connection for up to LONG_POLL_TIMEOUT seconds waiting for a
+    job to become available via RabbitMQ notification, avoiding tight polling
+    loops from the RunPod SDK.
     """
     if batch_size and batch_size > 1:
         return await job_take_batch(
+            request=request,
             pod_id=pod_id,
             batch_size=batch_size,
             job_in_progress=job_in_progress,
@@ -79,20 +96,16 @@ async def job_take_single(
             db=db,
         )
 
-    _ = job_in_progress  # Currently unused but accepted for compatibility.
-
     endpoint = _get_endpoint_for_pod(db, pod_id, executor)
 
-    job = (
-        db.query(Job)
-        .filter(
-            Job.endpoint_id == endpoint.id,
-            Job.executor_id == executor.id,
-            Job.status == JobStatus.IN_QUEUE,
-        )
-        .order_by(Job.id.asc())
-        .first()
-    )
+    job = _take_next_job(db, endpoint.id, executor.id)
+
+    if not job:
+        conn = getattr(request.app.state, "rabbitmq", None)
+        if conn:
+            await wait_for_executor_notification(conn, executor.id, LONG_POLL_TIMEOUT)
+            db.expire_all()
+            job = _take_next_job(db, endpoint.id, executor.id)
 
     if not job:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -104,6 +117,20 @@ async def job_take_single(
     return _serialize_job_for_runpod(job)
 
 
+def _take_batch_jobs(db: Session, endpoint_id: int, executor_id: int, limit: int) -> List[Job]:
+    return (
+        db.query(Job)
+        .filter(
+            Job.endpoint_id == endpoint_id,
+            Job.executor_id == executor_id,
+            Job.status == JobStatus.IN_QUEUE,
+        )
+        .order_by(Job.id.asc())
+        .limit(limit)
+        .all()
+    )
+
+
 @router.get("/job-take-batch/{pod_id}")
 async def job_take_batch(
     pod_id: int,
@@ -111,27 +138,22 @@ async def job_take_batch(
     job_in_progress: Optional[str] = "0",
     executor: Executor = Depends(get_current_executor),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """
-    RunPod-compatible batch job-take endpoint.
+    RunPod-compatible batch job-take endpoint with long-polling.
     """
-    _ = job_in_progress  # Currently unused but accepted for compatibility.
-
     endpoint = _get_endpoint_for_pod(db, pod_id, executor)
-
     limit = max(1, batch_size)
 
-    jobs: List[Job] = (
-        db.query(Job)
-        .filter(
-            Job.endpoint_id == endpoint.id,
-            Job.executor_id == executor.id,
-            Job.status == JobStatus.IN_QUEUE,
-        )
-        .order_by(Job.id.asc())
-        .limit(limit)
-        .all()
-    )
+    jobs = _take_batch_jobs(db, endpoint.id, executor.id, limit)
+
+    if not jobs:
+        conn = getattr(request.app.state, "rabbitmq", None) if request else None
+        if conn:
+            await wait_for_executor_notification(conn, executor.id, LONG_POLL_TIMEOUT)
+            db.expire_all()
+            jobs = _take_batch_jobs(db, endpoint.id, executor.id, limit)
 
     if not jobs:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

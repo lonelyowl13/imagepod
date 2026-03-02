@@ -4,6 +4,7 @@ from sqlalchemy import desc
 from app.models.endpoint import Endpoint
 from app.models.template import Template
 from app.models.executor import Executor
+from app.models.volume import EndpointVolume
 from app.schemas.endpoint import EndpointCreate, EndpointUpdate
 
 
@@ -38,7 +39,11 @@ def create_endpoint(db: Session, user_id: int, data: EndpointCreate) -> Endpoint
 def get_endpoint(db: Session, endpoint_id: int, user_id: Optional[int] = None) -> Optional[Endpoint]:
     query = (
         db.query(Endpoint)
-        .options(joinedload(Endpoint.template), joinedload(Endpoint.executor))
+        .options(
+            joinedload(Endpoint.template),
+            joinedload(Endpoint.executor),
+            joinedload(Endpoint.volume_mounts).joinedload(EndpointVolume.volume),
+        )
         .filter(Endpoint.id == endpoint_id)
     )
     if user_id is not None:
@@ -49,7 +54,11 @@ def get_endpoint(db: Session, endpoint_id: int, user_id: Optional[int] = None) -
 def get_user_endpoints(db: Session, user_id: int) -> List[Endpoint]:
     return (
         db.query(Endpoint)
-        .options(joinedload(Endpoint.template), joinedload(Endpoint.executor))
+        .options(
+            joinedload(Endpoint.template),
+            joinedload(Endpoint.executor),
+            joinedload(Endpoint.volume_mounts).joinedload(EndpointVolume.volume),
+        )
         .filter(Endpoint.user_id == user_id)
         .order_by(desc(Endpoint.created_at))
         .all()
