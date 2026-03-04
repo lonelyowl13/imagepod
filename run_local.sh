@@ -5,7 +5,7 @@ install() {
     echo "creating venv and installing dependencies..."
     uv venv --python 3.12
     source .venv/bin/activate
-    uv pip install -r requirements.txt
+    uv pip install -r pyproject.toml
     echo "venv created."
 }
 
