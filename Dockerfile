@@ -16,9 +16,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN uv pip install --system --no-cache -r pyproject.toml
+COPY app ./app
+RUN uv pip install --system --no-cache .
 
-# Copy project
+# Copy rest of project
 COPY . .
 
 # Create non-root user
