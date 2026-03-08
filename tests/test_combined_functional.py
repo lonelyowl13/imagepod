@@ -150,7 +150,7 @@ def test_process_job(base_url, tokens, executor):
 
     # set endpoint status to "ready"
     r = requests.patch(f"{base_url}/executors/endpoints/{endpoint["id"]}", headers=executor_headers, 
-    json={"status": "Ready"})
+    json={"status": "READY"})
 
     assert r.status_code == 200, r.text
 
@@ -197,4 +197,40 @@ def test_process_job(base_url, tokens, executor):
     assert completed_job["status"] == "COMPLETED", completed_job
     assert completed_job["delay_time"] == 123, completed_job
     assert completed_job["output"]["image"] == "https://images.com/123456.png", completed_job
-    
+
+
+@pytest.mark.functional
+def test_cancel_job(base_url, tokens, executor):
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    r = requests.get(f"{base_url}/endpoints", headers=headers)
+
+    assert r.status_code == 200, r.text
+    endpoint = r.json()[0]
+
+    r = requests.post(f"{base_url}/jobs/{endpoint["id"]}/run", headers=headers, json={
+        "input": {"prompt": "this job will be cancelled"}
+    })
+
+    assert r.status_code == 200, r.text
+    job_response = r.json()
+    assert job_response["status"] == "IN_QUEUE", job_response
+
+    r = requests.post(
+        f"{base_url}/jobs/{endpoint["id"]}/cancel/{job_response["id"]}",
+        headers=headers,
+    )
+
+    assert r.status_code == 200, r.text
+    cancelled = r.json()
+    assert cancelled["status"] == "CANCELLED", cancelled
+
+    r = requests.get(
+        f"{base_url}/jobs/{endpoint["id"]}/status/{job_response["id"]}",
+        headers=headers,
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "CANCELLED", r.json()
+

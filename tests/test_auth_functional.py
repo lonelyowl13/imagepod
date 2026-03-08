@@ -99,7 +99,7 @@ def api_key(base_url, tokens):
 
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-    r = requests.get(f"{base_url}/auth/key", headers=headers)
+    r = requests.post(f"{base_url}/auth/key", headers=headers)
 
     assert r.status_code == 200, r.text
     assert "api_key" in r.json().keys()
@@ -158,3 +158,49 @@ def test_delete_key(base_url, api_key):
 
     # key deleted - 401
     assert r.status_code == 401, r.text
+
+
+@pytest.mark.functional
+def test_change_password(base_url, test_user, tokens):
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    new_password = test_user["password"] + "_changed"
+
+    r = requests.post(f"{base_url}/auth/change-password", headers=headers, json={
+        "old_password": test_user["password"],
+        "new_password": new_password,
+        "new_password2": new_password,
+    })
+
+    assert r.status_code == 200, r.text
+
+    r = requests.post(f"{base_url}/auth/login", json={
+        "username": test_user["username"],
+        "password": new_password,
+    })
+
+    assert r.status_code == 200, r.text
+    assert "access_token" in r.json().keys()
+
+    r = requests.post(f"{base_url}/auth/login", json={
+        "username": test_user["username"],
+        "password": test_user["password"],
+    })
+
+    assert r.status_code == 401, r.text
+
+    # Restore original password so other tests aren't affected
+    new_tokens = requests.post(f"{base_url}/auth/login", json={
+        "username": test_user["username"],
+        "password": new_password,
+    }).json()
+
+    r = requests.post(f"{base_url}/auth/change-password",
+        headers={"Authorization": f"Bearer {new_tokens['access_token']}"},
+        json={
+            "old_password": new_password,
+            "new_password": test_user["password"],
+            "new_password2": test_user["password"],
+        })
+
+    assert r.status_code == 200, r.text
