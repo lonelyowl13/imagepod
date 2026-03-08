@@ -1,8 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from importlib.metadata import version as _pkg_version, PackageNotFoundError
 import uvicorn
 from app.config import settings
+
+try:
+    __version__ = _pkg_version("imagepod")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 from app.database import engine, Base
 from app.api import auth, jobs, endpoints, templates, executors, volumes, runpod
 from app.rabbitmq import connect as rabbitmq_connect
@@ -41,7 +47,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ImagePod API",
     description="Runpod-esque backend to run random stuff on your friend's gpu",
-    version="1.0.0",
+    version=__version__,
     lifespan=lifespan
 )
 
@@ -67,7 +73,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "ImagePod API",
-        "version": "1.0.0",
+        "version": __version__,
         "status": "running",
         "docs": "/docs"
     }

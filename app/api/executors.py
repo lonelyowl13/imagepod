@@ -21,6 +21,7 @@ from app.schemas.executor import (
 )
 from app.services.executor_service import (
     create_executor_with_key,
+    delete_executor,
     update_executor_spec,
     update_job_for_executor,
     get_endpoints_for_executor,
@@ -206,3 +207,18 @@ def list_executor_shares_route(
         return [ExecutorShareResponse(executor_id=executor_id, username=u) for u in usernames]
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{executor_id}", status_code=204)
+def delete_executor_route(
+    executor_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Delete an executor and all associated resources. Only the owner can delete."""
+    try:
+        if not delete_executor(db, executor_id, current_user.id):
+            raise HTTPException(status_code=404, detail="Executor not found")
+        return None  # 204 No Content
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))

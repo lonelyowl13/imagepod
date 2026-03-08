@@ -33,7 +33,7 @@ class Executor(Base):
     last_heartbeat = Column(DateTime(timezone=True))
     
     # Relationships
-    endpoints = relationship("Endpoint", back_populates="executor")
+    endpoints = relationship("Endpoint", back_populates="executor", cascade="all, delete-orphan")
     volumes = relationship("Volume", back_populates="executor", cascade="all, delete-orphan")
     user = relationship("User", back_populates="executors")
     shares = relationship("ExecutorShare", back_populates="executor", cascade="all, delete-orphan")

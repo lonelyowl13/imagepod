@@ -160,3 +160,53 @@ def test_unshare_executor(base_url, tokens, executor, second_user):
     assert r.status_code == 200, r.text
     shares = r.json()
     assert not any(s["username"] == second_user["username"] for s in shares)
+
+
+@pytest.mark.functional
+def test_delete_executor(base_url, tokens):
+    """Owner can delete an executor; it is removed from the list and all resources are gone."""
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    r = requests.post(f"{base_url}/executors/add", headers=headers, json={"name": "Executor To Delete"})
+    assert r.status_code == 200, r.text
+    executor_id = r.json()["executor_id"]
+
+    r = requests.delete(f"{base_url}/executors/{executor_id}", headers=headers)
+    assert r.status_code == 204
+
+    r = requests.get(f"{base_url}/executors/", headers=headers)
+    assert r.status_code == 200, r.text
+    executors = r.json()
+    assert not any(e["id"] == executor_id for e in executors)
+
+
+@pytest.mark.functional
+def test_delete_executor_forbidden_for_shared_user(base_url, tokens, executor, second_user):
+    """A user with whom the executor is shared cannot delete it."""
+    owner_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    r = requests.post(
+        f"{base_url}/executors/{executor['executor_id']}/share",
+        headers=owner_headers,
+        json={"username": second_user["username"]},
+    )
+    if r.status_code == 400 and "Already shared" in r.json().get("detail", ""):
+        pass  # already shared from another test
+    else:
+        assert r.status_code == 200, r.text
+
+    r = requests.delete(
+        f"{base_url}/executors/{executor['executor_id']}",
+        headers={"Authorization": f"Bearer {second_user['access_token']}"},
+    )
+    assert r.status_code == 403
+
+    r = requests.get(f"{base_url}/executors/", headers=owner_headers)
+    assert r.status_code == 200, r.text
+    assert any(e["id"] == executor["executor_id"] for e in r.json())
+
+
+@pytest.mark.functional
+def test_delete_executor_not_found(base_url, tokens):
+    """Deleting a non-existent executor returns 404."""
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    r = requests.delete(f"{base_url}/executors/999999", headers=headers)
+    assert r.status_code == 404

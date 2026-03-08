@@ -197,6 +197,17 @@ def unshare_executor(db: Session, executor_id: int, owner_id: int, target_userna
     return True
 
 
+def delete_executor(db: Session, executor_id: int, user_id: int) -> bool:
+    executor = db.query(Executor).filter(Executor.id == executor_id).first()
+    if not executor:
+        return False
+    if executor.user_id != user_id:
+        raise ValueError("Only the owner can delete the executor")
+    db.delete(executor)
+    db.commit()
+    return True
+
+
 def list_executor_shares(db: Session, executor_id: int, owner_id: int) -> List[str]:
     """Return usernames the executor is shared with. Only the owner can list."""
     executor = db.query(Executor).filter(Executor.id == executor_id).first()
