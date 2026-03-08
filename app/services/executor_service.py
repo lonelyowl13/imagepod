@@ -2,7 +2,8 @@ from typing import Optional, List, Tuple
 
 from sqlalchemy.orm import Session, joinedload
 from app.enums import JobStatus
-from app.models.executor import Executor
+from app.models.executor import Executor, ExecutorShare
+from app.models.user import User
 from app.models.job import Job
 from app.models.endpoint import Endpoint
 from app.models.volume import EndpointVolume
@@ -132,6 +133,77 @@ def get_endpoints_by_ids(
     )
 
 
-def get_executors_for_user(db: Session, user_id: int) -> List[Executor]:
-    """Return all executors owned by the given user."""
-    return db.query(Executor).filter(Executor.user_id == user_id).all()
+def get_executors_for_user(db: Session, user_id: int) -> List[dict]:
+    """Return all executors owned by or shared with the given user."""
+    owned = db.query(Executor).filter(Executor.user_id == user_id).all()
+    results = []
+    for e in owned:
+        results.append({"executor": e, "is_shared": False, "owner": None})
+
+    shared_rows = (
+        db.query(ExecutorShare)
+        .options(joinedload(ExecutorShare.executor).joinedload(Executor.user))
+        .filter(ExecutorShare.user_id == user_id)
+        .all()
+    )
+    for row in shared_rows:
+        results.append({
+            "executor": row.executor,
+            "is_shared": True,
+            "owner": row.executor.user.username,
+        })
+    return results
+
+
+def share_executor(db: Session, executor_id: int, owner_id: int, target_username: str) -> ExecutorShare:
+    executor = db.query(Executor).filter(Executor.id == executor_id).first()
+    if not executor or executor.user_id != owner_id:
+        raise ValueError("Executor not found")
+    target_user = db.query(User).filter(User.username == target_username).first()
+    if not target_user:
+        raise ValueError("User not found")
+    if target_user.id == owner_id:
+        raise ValueError("Cannot share with yourself")
+    existing = db.query(ExecutorShare).filter(
+        ExecutorShare.executor_id == executor_id,
+        ExecutorShare.user_id == target_user.id,
+    ).first()
+    if existing:
+        raise ValueError("Already shared with this user")
+    share = ExecutorShare(executor_id=executor_id, user_id=target_user.id)
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    return share
+
+
+def unshare_executor(db: Session, executor_id: int, owner_id: int, target_username: str) -> bool:
+    executor = db.query(Executor).filter(Executor.id == executor_id).first()
+    if not executor or executor.user_id != owner_id:
+        raise ValueError("Executor not found")
+    target_user = db.query(User).filter(User.username == target_username).first()
+    if not target_user:
+        raise ValueError("User not found")
+    share = db.query(ExecutorShare).filter(
+        ExecutorShare.executor_id == executor_id,
+        ExecutorShare.user_id == target_user.id,
+    ).first()
+    if not share:
+        return False
+    db.delete(share)
+    db.commit()
+    return True
+
+
+def list_executor_shares(db: Session, executor_id: int, owner_id: int) -> List[str]:
+    """Return usernames the executor is shared with. Only the owner can list."""
+    executor = db.query(Executor).filter(Executor.id == executor_id).first()
+    if not executor or executor.user_id != owner_id:
+        raise ValueError("Executor not found")
+    shares = (
+        db.query(ExecutorShare)
+        .options(joinedload(ExecutorShare.user))
+        .filter(ExecutorShare.executor_id == executor_id)
+        .all()
+    )
+    return [s.user.username for s in shares]

@@ -50,9 +50,20 @@ class ExecutorSummary(BaseModel):
     ram: Optional[int] = None  # bytes
     vram: Optional[int] = None  # bytes
     last_heartbeat: Optional[datetime] = None
+    is_shared: bool = False
+    owner: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class ExecutorShareRequest(BaseModel):
+    username: str
+
+
+class ExecutorShareResponse(BaseModel):
+    executor_id: int
+    username: str
 
 
 class EndpointUpdateItem(BaseModel):

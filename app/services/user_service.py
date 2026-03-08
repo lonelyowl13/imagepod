@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.user import User
-from app.services.auth_service import get_password_hash
+from app.services.auth_service import get_password_hash, verify_password
 
 
 def create_user(db: Session, username: str, password: str) -> User:
@@ -16,6 +16,13 @@ def create_user(db: Session, username: str, password: str) -> User:
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def change_password(db: Session, user: User, old_password: str, new_password: str) -> None:
+    if not verify_password(old_password, user.hashed_password):
+        raise ValueError("Incorrect password")
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
 
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:

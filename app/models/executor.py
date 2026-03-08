@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey
+from sqlalchemy import BigInteger, Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -36,3 +36,18 @@ class Executor(Base):
     endpoints = relationship("Endpoint", back_populates="executor")
     volumes = relationship("Volume", back_populates="executor", cascade="all, delete-orphan")
     user = relationship("User", back_populates="executors")
+    shares = relationship("ExecutorShare", back_populates="executor", cascade="all, delete-orphan")
+
+
+class ExecutorShare(Base):
+    __tablename__ = "executor_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    executor_id = Column(Integer, ForeignKey("executors.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    executor = relationship("Executor", back_populates="shares")
+    user = relationship("User")
+
+    __table_args__ = (UniqueConstraint("executor_id", "user_id", name="uq_executor_share"),)

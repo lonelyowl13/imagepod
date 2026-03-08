@@ -13,6 +13,7 @@ from app.services.auth_service import (
 from app.schemas.user import (
     ApiKey,
     ApiKeyMetadata,
+    ChangePasswordRequest,
     KeyList,
     RegisterRequest,
     UserResponse,
@@ -20,7 +21,7 @@ from app.schemas.user import (
     Token,
     RefreshRequest,
 )
-from app.services.user_service import create_user, get_user_by_username
+from app.services.user_service import create_user, change_password, get_user_by_username
 from app.services.api_key_service import (
     create_api_key as create_api_key_record,
     delete_api_key,
@@ -91,6 +92,20 @@ async def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         refresh_token=refresh_token,
         token_type="bearer",
     )
+
+
+@router.post("/change-password")
+async def change_password_route(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Change password for the current user. Requires old password."""
+    try:
+        change_password(db, current_user, body.old_password, body.new_password)
+        return {"detail": "password changed"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/keys", response_model=KeyList)

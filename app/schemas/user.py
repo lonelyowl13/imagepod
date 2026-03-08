@@ -77,3 +77,20 @@ class ApiKeyMetadata(BaseModel):
 class KeyList(BaseModel):
     keys: list[ApiKeyMetadata]
 
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+    new_password2: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _password_min_length(v)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.new_password != self.new_password2:
+            raise ValueError("passwords do not match")
+        return self
+

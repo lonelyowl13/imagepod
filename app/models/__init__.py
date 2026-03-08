@@ -3,7 +3,7 @@ from .api_key import ApiKey
 from .job import Job
 from .endpoint import Endpoint
 from .template import Template
-from .executor import Executor
+from .executor import Executor, ExecutorShare
 from .volume import Volume, EndpointVolume
 
 __all__ = [
@@ -13,6 +13,7 @@ __all__ = [
     "Endpoint",
     "Template",
     "Executor",
+    "ExecutorShare",
     "Volume",
     "EndpointVolume",
 ]

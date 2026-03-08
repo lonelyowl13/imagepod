@@ -13,6 +13,8 @@ from app.schemas.executor import (
     ExecutorAddResponse,
     ExecutorRegisterRequest,
     ExecutorJobUpdateRequest,
+    ExecutorShareRequest,
+    ExecutorShareResponse,
     ExecutorSummary,
     ExecutorUpdatesResponse,
     EndpointStatusUpdate,
@@ -23,6 +25,9 @@ from app.services.executor_service import (
     update_job_for_executor,
     get_endpoints_for_executor,
     get_executors_for_user,
+    share_executor,
+    unshare_executor,
+    list_executor_shares,
 )
 from app.services.endpoint_service import update_endpoint_status_by_executor
 from app.rabbitmq import wait_for_executor_notification
@@ -113,9 +118,16 @@ def list_user_executors(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """List all executors owned by the current user."""
-    executors = get_executors_for_user(db, current_user.id)
-    return executors
+    """List all executors owned by or shared with the current user."""
+    rows = get_executors_for_user(db, current_user.id)
+    results = []
+    for row in rows:
+        e = row["executor"]
+        summary = ExecutorSummary.model_validate(e)
+        summary.is_shared = row["is_shared"]
+        summary.owner = row["owner"]
+        results.append(summary)
+    return results
 
 
 @router.get("/endpoints")
@@ -149,3 +161,48 @@ def update_endpoint_status(
     if not updated:
         raise HTTPException(status_code=404, detail="Endpoint not found")
     return {"detail": "ok", "id": updated.id, "status": updated.status}
+
+
+@router.post("/{executor_id}/share", response_model=ExecutorShareResponse)
+def share_executor_route(
+    executor_id: int,
+    body: ExecutorShareRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Share an executor with another user by username. Only the owner can share."""
+    try:
+        share_executor(db, executor_id, current_user.id, body.username)
+        return ExecutorShareResponse(executor_id=executor_id, username=body.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{executor_id}/share/{username}")
+def unshare_executor_route(
+    executor_id: int,
+    username: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Revoke executor sharing for a user. Only the owner can revoke."""
+    try:
+        if not unshare_executor(db, executor_id, current_user.id, username):
+            raise HTTPException(status_code=404, detail="Share not found")
+        return {"detail": "share revoked"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{executor_id}/shares", response_model=List[ExecutorShareResponse])
+def list_executor_shares_route(
+    executor_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """List users an executor is shared with. Only the owner can view."""
+    try:
+        usernames = list_executor_shares(db, executor_id, current_user.id)
+        return [ExecutorShareResponse(executor_id=executor_id, username=u) for u in usernames]
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
