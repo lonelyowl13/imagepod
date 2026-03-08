@@ -22,7 +22,9 @@ def create_executor_with_key(db: Session, user_id: int, name: str) -> Optional[T
 
 
 def get_executor_by_api_key(db: Session, api_key: str) -> Optional[Executor]:
-    key_hash = hash_key(api_key)
+    if not api_key or not isinstance(api_key, str):
+        return None
+    key_hash = hash_key(api_key.strip())
     return db.query(Executor).filter(Executor.token_hash == key_hash).first()
 
 
