@@ -4,8 +4,10 @@ from app.enums import JobStatus
 from app.models.job import Job
 from app.models.endpoint import Endpoint
 from app.schemas.job import JobStatusUpdate
+from app.utils import emit_executor_notification
 
 
+@emit_executor_notification
 def create_job_for_endpoint(
     db: Session, endpoint_id: int, user_id: int, input_data: Dict[str, Any]
 ) -> Job:
@@ -46,6 +48,7 @@ def get_job_by_endpoint(
     return job
 
 
+@emit_executor_notification
 def cancel_job(db: Session, job_id: int) -> Optional[Job]:
     job = get_job(db, job_id)
     if not job:

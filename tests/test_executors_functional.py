@@ -94,6 +94,19 @@ def test_list_executors(base_url, tokens, executor):
 
 
 @pytest.mark.functional
+def test_executor_updates_notifications_shape(base_url, executor):
+    """Executor updates should include a notifications array."""
+    headers = {"Authorization": f"Bearer {executor['api_key']}"}
+
+    r = requests.get(f"{base_url}/executors/updates", headers=headers, params={"timeout": 0})
+
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "notifications" in data
+    assert isinstance(data["notifications"], list)
+
+
+@pytest.mark.functional
 def test_share_executor(base_url, tokens, executor, second_user):
 
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}

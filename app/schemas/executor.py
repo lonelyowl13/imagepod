@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.enums import EndpointStatus, JobStatus
+from app.schemas.notification import Notification
 from app.schemas.template import TemplateResponse
 from app.schemas.volume import EndpointVolumeInfo
 from app.schemas.job import JobResponse
@@ -83,6 +84,9 @@ class EndpointUpdateItem(BaseModel):
 
 
 class ExecutorUpdatesResponse(BaseModel):
-    """Unified response for GET /executors/updates: jobs IN_QUEUE + endpoints with status Deploying."""
-    jobs: List[JobResponse]
-    endpoints: List[EndpointUpdateItem]
+    """Response for GET /executors/updates: pending notifications."""
+    notifications: List[Notification]
+
+
+class ExecutorNotificationsAckRequest(BaseModel):
+    notification_ids: List[int]

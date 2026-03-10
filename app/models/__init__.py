@@ -5,6 +5,7 @@ from .endpoint import Endpoint
 from .template import Template
 from .pod import Pod
 from .executor import Executor, ExecutorShare
+from .executor_notification import ExecutorNotification
 from .volume import Volume, EndpointVolume
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "Pod",
     "Executor",
     "ExecutorShare",
+    "ExecutorNotification",
     "Volume",
     "EndpointVolume",
 ]

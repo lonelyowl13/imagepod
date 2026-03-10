@@ -10,6 +10,8 @@ from app.models.executor import Executor, ExecutorShare
 from app.schemas.pod import PodCreate, PodUpdate
 from sqlalchemy.sql import func
 
+from app.utils import emit_executor_notification
+
 
 def _user_can_use_executor(db: Session, executor: Executor, user_id: int) -> bool:
     if executor.user_id == user_id:
@@ -32,6 +34,7 @@ def _build_env(template_env: Optional[Dict[str, Any]], override_env: Optional[Di
     return base
 
 
+@emit_executor_notification
 def create_pod(db: Session, user_id: int, data: PodCreate) -> Pod:
     template = db.query(Template).filter(Template.id == data.template_id).first()
     if not template:
@@ -91,6 +94,7 @@ def get_user_pods(db: Session, user_id: int) -> List[Pod]:
     )
 
 
+@emit_executor_notification
 def update_pod(
     db: Session, pod_id: int, data: PodUpdate, user_id: int
 ) -> Optional[Pod]:
@@ -127,15 +131,17 @@ def update_pod(
     return pod
 
 
-def delete_pod(db: Session, pod_id: int, user_id: int) -> bool:
+@emit_executor_notification
+def delete_pod(db: Session, pod_id: int, user_id: int) -> Optional[Pod]:
     pod = get_pod(db, pod_id, user_id)
     if not pod:
-        return False
+        return None
     db.delete(pod)
     db.commit()
     return True
 
 
+@emit_executor_notification
 def start_pod(db: Session, pod_id: int, user_id: int) -> Optional[Pod]:
     pod = get_pod(db, pod_id, user_id)
     if not pod:
@@ -152,6 +158,7 @@ def start_pod(db: Session, pod_id: int, user_id: int) -> Optional[Pod]:
     return pod
 
 
+@emit_executor_notification
 def stop_pod(db: Session, pod_id: int, user_id: int) -> Optional[Pod]:
     pod = get_pod(db, pod_id, user_id)
     if not pod:
@@ -166,6 +173,7 @@ def stop_pod(db: Session, pod_id: int, user_id: int) -> Optional[Pod]:
     return pod
 
 
+@emit_executor_notification
 def mark_pod_terminated(
     db: Session, pod_id: int, executor_id: int
 ) -> Optional[Pod]:

@@ -3,6 +3,7 @@ from .job import JobResponse, JobRunRequest, JobRunResponse, JobStatusUpdate
 from .endpoint import EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
 from .template import TemplateCreate, TemplateUpdate, TemplateResponse
 from .pod import PodCreate, PodUpdate, PodResponse
+from .notification import Notification
 
 __all__ = [
     "RegisterRequest", "LoginRequest", "RefreshRequest", "UserResponse", "Token",
@@ -10,5 +11,6 @@ __all__ = [
     "EndpointCreate", "EndpointUpdate", "EndpointResponse", "ExecutorResponse",
     "TemplateCreate", "TemplateUpdate", "TemplateResponse",
     "PodCreate", "PodUpdate", "PodResponse",
+    "Notification",
     "ApiKey", "ApiKeyMetadata", "KeyList"
 ]

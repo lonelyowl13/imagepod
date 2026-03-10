@@ -20,3 +20,17 @@ class PodStatus(str, Enum):
     RUNNING = "RUNNING"
     STOPPED = "STOPPED"
     TERMINATED = "TERMINATED"
+
+
+class NotificationType(str, Enum):
+    JOB_CHANGED = "JOB_CHANGED"
+    ENDPOINT_CHANGED = "ENDPOINT_CHANGED"
+    POD_STATUS_CHANGED = "POD_STATUS_CHANGED"
+    VOLUME_CHANGED = "VOLUME_CHANGED"
+
+
+class EntityKind(str, Enum):
+    JOB = "JOB"
+    ENDPOINT = "ENDPOINT"
+    POD = "POD"
+    VOLUME = "VOLUME"

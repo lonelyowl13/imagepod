@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -32,6 +32,7 @@ from app.services.executor_service import (
 )
 from app.services.endpoint_service import update_endpoint_status_by_executor
 from app.rabbitmq import wait_for_executor_notification
+from app.services.notification_service import acknowledge_notifications
 
 router = APIRouter(prefix="/executors", tags=["executors"])
 
@@ -90,6 +91,19 @@ async def get_updates(
     if conn and wait_seconds > 0:
         await wait_for_executor_notification(conn, executor.id, wait_seconds)
     return build_updates_response(db, executor.id)
+
+
+@router.post("/updates")
+def acknowledge_updates(
+    notification_ids: list[int] = Body(..., embed=True),
+    executor: Executor = Depends(get_current_executor),
+    db: Session = Depends(get_db),
+):
+    """
+    Acknowledge a list of executor notifications by id.
+    """
+    updated_count = acknowledge_notifications(db, executor.id, notification_ids)
+    return {"detail": "ok", "acknowledged_count": updated_count}
 
 
 @router.patch("/job/{job_id}")
