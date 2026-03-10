@@ -6,10 +6,8 @@ from app.models.volume import Volume, EndpointVolume
 from app.models.endpoint import Endpoint
 from app.models.executor import Executor
 from app.schemas.volume import VolumeCreate, VolumeUpdate
-from app.utils import emit_executor_notification
 
 
-@emit_executor_notification
 def create_volume(db: Session, user_id: int, data: VolumeCreate) -> Volume:
     executor = db.query(Executor).filter(
         Executor.id == data.executor_id,
@@ -44,7 +42,6 @@ def get_volumes_by_executor(db: Session, executor_id: int) -> List[Volume]:
     return db.query(Volume).filter(Volume.executor_id == executor_id).all()
 
 
-@emit_executor_notification
 def update_volume(db: Session, volume_id: int, user_id: int, data: VolumeUpdate) -> Optional[Volume]:
     volume = get_volume(db, volume_id, user_id)
     if not volume:
@@ -57,7 +54,6 @@ def update_volume(db: Session, volume_id: int, user_id: int, data: VolumeUpdate)
     return volume
 
 
-@emit_executor_notification
 def delete_volume(db: Session, volume_id: int, user_id: int) -> Optional[Volume]:
     volume = get_volume(db, volume_id, user_id)
     if not volume:
@@ -67,7 +63,6 @@ def delete_volume(db: Session, volume_id: int, user_id: int) -> Optional[Volume]
     return volume
 
 
-@emit_executor_notification
 def mount_volume(
     db: Session,
     user_id: int,
@@ -110,7 +105,6 @@ def mount_volume(
     return mount
 
 
-@emit_executor_notification
 def unmount_volume(db: Session, user_id: int, endpoint_id: int, volume_id: int) -> bool:
     """Unmount a volume from an endpoint."""
     endpoint = db.query(Endpoint).filter(

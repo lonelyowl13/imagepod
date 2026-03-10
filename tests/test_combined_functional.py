@@ -99,7 +99,7 @@ def executor(base_url, tokens):
     }
 
     r = requests.post(f"{base_url}/executors/register", headers=headers, json=body)
-
+    assert r.status_code == 200, r.text
 
     return {
         "api_key": api_key,
@@ -166,13 +166,17 @@ def test_process_job(base_url, tokens, executor):
     assert "id" in job_response.keys(), job_response
     assert job_response["status"] == "IN_QUEUE", job_response
 
-    # executor gets updates (jobs IN_QUEUE + endpoints Deploying)
+    # executor gets updates (notifications include new job)
+    job_id = job_response["id"]
     r = requests.get(f"{base_url}/executors/updates", headers=executor_headers, params={"timeout": 0})
 
     assert r.status_code == 200, r.text
     data = r.json()
-    assert "jobs" in data and "endpoints" in data
-    job = data["jobs"][0]
+    assert "notifications" in data
+    assert isinstance(data["notifications"], list)
+    # at least one notification should be for this job
+    job_notifications = [n for n in data["notifications"] if n.get("entity_kind") == "JOB" and n.get("entity_id") == job_id]
+    assert len(job_notifications) >= 1, "executor should have received a notification for the new job"
 
     body = {
         "delay_time": 123,
@@ -184,12 +188,12 @@ def test_process_job(base_url, tokens, executor):
     }
 
     # executor completed the job
-    r = requests.patch(f"{base_url}/executors/job/{job["id"]}", headers=executor_headers, json=body)
+    r = requests.patch(f"{base_url}/executors/job/{job_id}", headers=executor_headers, json=body)
 
     assert r.status_code == 200, r.text
 
     # user querying their job
-    r = requests.get(f"{base_url}/jobs/{endpoint["id"]}/status/{job["id"]}", headers=headers)
+    r = requests.get(f"{base_url}/jobs/{endpoint['id']}/status/{job_id}", headers=headers)
 
     assert r.status_code == 200, r.text
     completed_job = r.json()

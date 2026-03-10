@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.enums import EndpointStatus
+from app.enums import EndpointStatus, EntityKind, NotificationType
 from app.api.helpers import format_template_response, get_current_active_user
+from app.services.notification_service import create_notification
 from app.models.user import User
 from app.schemas.endpoint import (
     EndpointCreate, EndpointUpdate, EndpointResponse, ExecutorResponse
@@ -78,6 +79,8 @@ async def create_endpoint_route(
     try:
         endpoint = svc_create(db, current_user.id, endpoint_data)
         endpoint = get_endpoint(db, endpoint.id, current_user.id)
+        payload = _format_endpoint_response(endpoint).model_dump(mode="json")
+        create_notification(db, endpoint.executor_id, NotificationType.ENDPOINT_CHANGED, EntityKind.ENDPOINT, endpoint.id, payload)
         conn = getattr(request.app.state, "rabbitmq", None)
         if conn:
             await publish_job_notification(conn, endpoint.executor_id)
@@ -123,6 +126,8 @@ async def update_endpoint_route(
         if not updated:
             raise HTTPException(status_code=404, detail="Endpoint not found")
         updated = get_endpoint(db, id, current_user.id)
+        payload = _format_endpoint_response(updated).model_dump(mode="json")
+        create_notification(db, updated.executor_id, NotificationType.ENDPOINT_CHANGED, EntityKind.ENDPOINT, updated.id, payload)
         conn = getattr(request.app.state, "rabbitmq", None)
         if conn:
             await publish_job_notification(conn, updated.executor_id)
@@ -138,6 +143,12 @@ async def delete_endpoint_route(
     db: Session = Depends(get_db),
 ):
     """Delete an endpoint"""
-    if not delete_endpoint(db, id, current_user.id):
+    endpoint = get_endpoint(db, id, current_user.id)
+    if not endpoint:
         raise HTTPException(status_code=404, detail="Endpoint not found")
+    payload = _format_endpoint_response(endpoint).model_dump(mode="json")
+    executor_id = endpoint.executor_id
+    entity_id = endpoint.id
+    delete_endpoint(db, id, current_user.id)
+    create_notification(db, executor_id, NotificationType.ENDPOINT_DELETED, EntityKind.ENDPOINT, entity_id, payload)
     return {"message": "Endpoint deleted successfully"}

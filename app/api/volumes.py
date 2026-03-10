@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.enums import EntityKind, NotificationType
 from app.api.helpers import get_current_active_user
 from app.models.user import User
+from app.services.notification_service import create_notification
 from app.schemas.volume import (
     VolumeCreate,
     VolumeUpdate,
@@ -36,6 +38,8 @@ async def create_volume_route(
     """Create a new volume on a specific executor."""
     try:
         volume = svc_create(db, current_user.id, data)
+        payload = VolumeResponse.model_validate(volume, from_attributes=True).model_dump(mode="json")
+        create_notification(db, volume.executor_id, NotificationType.VOLUME_CHANGED, EntityKind.VOLUME, volume.id, payload)
         return volume
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -74,6 +78,8 @@ async def update_volume_route(
     updated = update_volume(db, volume_id, current_user.id, data)
     if not updated:
         raise HTTPException(status_code=404, detail="Volume not found")
+    payload = VolumeResponse.model_validate(updated, from_attributes=True).model_dump(mode="json")
+    create_notification(db, updated.executor_id, NotificationType.VOLUME_CHANGED, EntityKind.VOLUME, updated.id, payload)
     return updated
 
 
@@ -84,8 +90,14 @@ async def delete_volume_route(
     db: Session = Depends(get_db),
 ):
     """Delete a volume. Removes all associated mounts."""
-    if not delete_volume(db, volume_id, current_user.id):
+    volume = get_volume(db, volume_id, current_user.id)
+    if not volume:
         raise HTTPException(status_code=404, detail="Volume not found")
+    payload = VolumeResponse.model_validate(volume, from_attributes=True).model_dump(mode="json")
+    executor_id = volume.executor_id
+    entity_id = volume.id
+    delete_volume(db, volume_id, current_user.id)
+    create_notification(db, executor_id, NotificationType.VOLUME_DELETED, EntityKind.VOLUME, entity_id, payload)
     return {"message": "Volume deleted successfully"}
 
 
@@ -101,6 +113,8 @@ async def mount_volume_route(
         ev = mount_volume(db, current_user.id, endpoint_id, body.volume_id, body.mount_path)
         ev_with_vol = get_mounts_for_endpoint(db, endpoint_id)
         matched = next((m for m in ev_with_vol if m.id == ev.id), ev)
+        payload = VolumeMountResponse.model_validate(matched, from_attributes=True).model_dump(mode="json")
+        create_notification(db, matched.volume.executor_id, NotificationType.VOLUME_MOUNTED, EntityKind.VOLUME, matched.id, payload)
         return matched
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -114,8 +128,16 @@ async def unmount_volume_route(
     db: Session = Depends(get_db),
 ):
     """Unmount a volume from an endpoint."""
+    mounts = get_mounts_for_endpoint(db, endpoint_id)
+    mount = next((m for m in mounts if m.volume_id == volume_id), None)
+    if not mount:
+        raise HTTPException(status_code=404, detail="Mount not found")
+    payload = VolumeMountResponse.model_validate(mount, from_attributes=True).model_dump(mode="json")
+    executor_id = mount.volume.executor_id
+    entity_id = mount.id
     if not unmount_volume(db, current_user.id, endpoint_id, volume_id):
         raise HTTPException(status_code=404, detail="Mount not found")
+    create_notification(db, executor_id, NotificationType.VOLUME_UNMOUNTED, EntityKind.VOLUME, entity_id, payload)
     return {"message": "Volume unmounted successfully"}
 
 

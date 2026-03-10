@@ -6,7 +6,6 @@ from app.models.template import Template
 from app.models.executor import Executor, ExecutorShare
 from app.models.volume import EndpointVolume
 from app.schemas.endpoint import EndpointCreate, EndpointUpdate
-from app.utils import emit_executor_notification
 
 
 def _user_can_use_executor(db: Session, executor: Executor, user_id: int) -> bool:
@@ -17,7 +16,7 @@ def _user_can_use_executor(db: Session, executor: Executor, user_id: int) -> boo
         ExecutorShare.user_id == user_id,
     ).first() is not None
 
-@emit_executor_notification
+
 def create_endpoint(db: Session, user_id: int, data: EndpointCreate) -> Endpoint:
     template = db.query(Template).filter(Template.id == data.template_id).first()
     if not template:
@@ -76,7 +75,6 @@ def get_user_endpoints(db: Session, user_id: int) -> List[Endpoint]:
         .all()
     )
 
-@emit_executor_notification
 def update_endpoint(
     db: Session, endpoint_id: int, data: EndpointUpdate, user_id: int
 ) -> Optional[Endpoint]:
@@ -105,7 +103,6 @@ def update_endpoint(
     return endpoint
 
 
-@emit_executor_notification
 def delete_endpoint(db: Session, endpoint_id: int, user_id: int) -> Optional[Endpoint]:
     endpoint = get_endpoint(db, endpoint_id, user_id)
     if not endpoint:
