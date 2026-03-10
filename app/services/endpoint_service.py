@@ -21,6 +21,8 @@ def create_endpoint(db: Session, user_id: int, data: EndpointCreate) -> Endpoint
     template = db.query(Template).filter(Template.id == data.template_id).first()
     if not template:
         raise ValueError("Template not found")
+    if getattr(template, "is_serverless", True) is not True:
+        raise ValueError("Template is not serverless")
     executor = db.query(Executor).filter(Executor.id == data.executor_id).first()
     if not executor:
         raise ValueError("Executor not found")

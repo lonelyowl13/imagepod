@@ -37,6 +37,7 @@ class Executor(Base):
     volumes = relationship("Volume", back_populates="executor", cascade="all, delete-orphan")
     user = relationship("User", back_populates="executors")
     shares = relationship("ExecutorShare", back_populates="executor", cascade="all, delete-orphan")
+    pods = relationship("Pod", back_populates="executor")
 
 
 class ExecutorShare(Base):

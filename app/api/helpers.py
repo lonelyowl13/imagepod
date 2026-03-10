@@ -30,6 +30,7 @@ def format_template_response(template) -> TemplateResponse:
         docker_entrypoint=template.docker_entrypoint or [],
         docker_start_cmd=template.docker_start_cmd or [],
         env=template.env or {},
+        is_serverless=getattr(template, "is_serverless", True),
     )
 
 

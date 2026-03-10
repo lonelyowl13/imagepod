@@ -14,6 +14,7 @@ def create_template(db: Session, user_id: int, data: TemplateCreate) -> Template
         docker_entrypoint=data.docker_entrypoint or [],
         docker_start_cmd=data.docker_start_cmd or [],
         env=data.env or {},
+        is_serverless=data.is_serverless,
     )
     db.add(t)
     db.commit()

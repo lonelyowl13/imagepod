@@ -14,3 +14,9 @@ class EndpointStatus(str, Enum):
     DEPLOYING = "DEPLOYING"
     READY = "READY"
     UNHEALTHY = "UNHEALTHY"
+
+
+class PodStatus(str, Enum):
+    RUNNING = "RUNNING"
+    STOPPED = "STOPPED"
+    TERMINATED = "TERMINATED"
