@@ -14,6 +14,7 @@ from app.services.pod_service import (
     create_pod as svc_create,
     get_pod,
     get_user_pods,
+    mark_pod_terminated,
     update_pod,
     delete_pod,
     start_pod,
@@ -124,13 +125,14 @@ async def delete_pod_route(
 ):
     """Delete a pod."""
     pod = get_pod(db, id, current_user.id)
+    mark_pod_terminated(db, id, pod.executor_id)
     if not pod:
         raise HTTPException(status_code=404, detail="Pod not found")
     payload = _format_pod_response(pod).model_dump(mode="json")
     executor_id = pod.executor_id
     entity_id = pod.id
     delete_pod(db, id, current_user.id)
-    create_notification(db, executor_id, NotificationType.POD_STATUS_CHANGED, EntityKind.POD, entity_id, payload)
+    create_notification(db, executor_id, NotificationType.POD_TERMINATED, EntityKind.POD, entity_id, payload)
     return {"message": "Pod deleted successfully"}
 
 
