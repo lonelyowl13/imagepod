@@ -21,6 +21,8 @@ def create_endpoint(db: Session, user_id: int, data: EndpointCreate) -> Endpoint
     template = db.query(Template).filter(Template.id == data.template_id).first()
     if not template:
         raise ValueError("Template not found")
+    if getattr(template, "is_serverless", True) is not True:
+        raise ValueError("Template is not serverless")
     executor = db.query(Executor).filter(Executor.id == data.executor_id).first()
     if not executor:
         raise ValueError("Executor not found")
@@ -73,7 +75,6 @@ def get_user_endpoints(db: Session, user_id: int) -> List[Endpoint]:
         .all()
     )
 
-
 def update_endpoint(
     db: Session, endpoint_id: int, data: EndpointUpdate, user_id: int
 ) -> Optional[Endpoint]:
@@ -102,13 +103,13 @@ def update_endpoint(
     return endpoint
 
 
-def delete_endpoint(db: Session, endpoint_id: int, user_id: int) -> bool:
+def delete_endpoint(db: Session, endpoint_id: int, user_id: int) -> Optional[Endpoint]:
     endpoint = get_endpoint(db, endpoint_id, user_id)
     if not endpoint:
-        return False
+        return None
     db.delete(endpoint)
     db.commit()
-    return True
+    return endpoint
 
 
 def update_endpoint_status_by_executor(

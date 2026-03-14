@@ -69,15 +69,29 @@ def executor(base_url, tokens):
     r = requests.post(f"{base_url}/executors/add", headers=headers, json={
         "name": "Executor For Sharing",
     })
-
     assert r.status_code == 200, r.text
     j = r.json()
     assert "api_key" in j and "executor_id" in j
+    api_key = j["api_key"]
+    executor_id = j["executor_id"]
 
-    return {
-        "api_key": j["api_key"],
-        "executor_id": j["executor_id"],
-    }
+    # Register executor with fake specs so compute_type etc. are set
+    r = requests.post(
+        f"{base_url}/executors/register",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "gpu": "Test GPU",
+            "vram": 3221225472,
+            "cpu": "Test CPU",
+            "ram": 17179869184,
+            "compute_type": "GPU",
+            "cuda_version": "12.0",
+            "metadata": {},
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    return {"api_key": api_key, "executor_id": executor_id}
 
 
 @pytest.mark.functional
@@ -91,6 +105,19 @@ def test_list_executors(base_url, tokens, executor):
     executors = r.json()
     assert isinstance(executors, list)
     assert any(e["id"] == executor["executor_id"] for e in executors)
+
+
+@pytest.mark.functional
+def test_executor_updates_notifications_shape(base_url, executor):
+    """Executor updates should include a notifications array."""
+    headers = {"Authorization": f"Bearer {executor['api_key']}"}
+
+    r = requests.get(f"{base_url}/executors/updates", headers=headers, params={"timeout": 0})
+
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "notifications" in data
+    assert isinstance(data["notifications"], list)
 
 
 @pytest.mark.functional

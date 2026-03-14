@@ -54,13 +54,13 @@ def update_volume(db: Session, volume_id: int, user_id: int, data: VolumeUpdate)
     return volume
 
 
-def delete_volume(db: Session, volume_id: int, user_id: int) -> bool:
+def delete_volume(db: Session, volume_id: int, user_id: int) -> Optional[Volume]:
     volume = get_volume(db, volume_id, user_id)
     if not volume:
-        return False
+        return None
     db.delete(volume)
     db.commit()
-    return True
+    return volume
 
 
 def mount_volume(

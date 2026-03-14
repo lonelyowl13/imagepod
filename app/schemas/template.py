@@ -8,6 +8,7 @@ class TemplateCreate(BaseModel):
     docker_entrypoint: Optional[List[str]] = None
     docker_start_cmd: Optional[List[str]] = None
     env: Optional[Dict[str, Any]] = None
+    is_serverless: bool = True
 
 
 class TemplateUpdate(BaseModel):
@@ -16,6 +17,7 @@ class TemplateUpdate(BaseModel):
     docker_entrypoint: Optional[List[str]] = None
     docker_start_cmd: Optional[List[str]] = None
     env: Optional[Dict[str, Any]] = None
+    is_serverless: Optional[bool] = None
 
 
 class TemplateResponse(BaseModel):
@@ -25,6 +27,7 @@ class TemplateResponse(BaseModel):
     docker_entrypoint: List[str]
     docker_start_cmd: List[str]
     env: Dict[str, Any]
+    is_serverless: bool
 
     class Config:
         from_attributes = True

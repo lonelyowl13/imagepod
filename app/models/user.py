@@ -18,3 +18,4 @@ class User(Base):
     templates = relationship("Template", back_populates="user")
     executors = relationship("Executor", back_populates="user")
     volumes = relationship("Volume", back_populates="user")
+    pods = relationship("Pod", back_populates="user")
