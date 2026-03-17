@@ -11,8 +11,6 @@ class PodTunnel(Base):
     id = Column(Integer, primary_key=True, index=True)
     pod_id = Column(Integer, ForeignKey("pods.id", ondelete="CASCADE"), nullable=False, index=True)
     port = Column(Integer, nullable=False)
-    # 8 random hex chars prepended to the subdomain to prevent enumeration
-    token = Column(String(8), nullable=False)
     domain = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

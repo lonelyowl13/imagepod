@@ -64,13 +64,11 @@ def create_pod(db: Session, user_id: int, data: PodCreate) -> Pod:
     db.flush()  # assigns pod.id before creating tunnels
 
     slug = f"pod-{pod.id}"
-    tunnel_pairs: List[tuple] = []
     for port in (data.ports or []):
-        token = secrets.token_hex(4)  # 8 hex chars
-        domain = f"{token}-{slug}-{port}.{settings.proxy_domain}"
-        tunnel = PodTunnel(pod_id=pod.id, port=port, token=token, domain=domain)
+        prefix = secrets.token_hex(4)  # 8 hex chars for subdomain uniqueness
+        domain = f"{prefix}-{slug}-{port}.{settings.proxy_domain}"
+        tunnel = PodTunnel(pod_id=pod.id, port=port, domain=domain)
         db.add(tunnel)
-        tunnel_pairs.append((port, token))
 
     db.commit()
     db.refresh(pod)

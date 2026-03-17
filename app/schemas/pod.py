@@ -11,7 +11,6 @@ from app.schemas.endpoint import ExecutorResponse
 class PodTunnelResponse(BaseModel):
     id: int
     port: int
-    token: str
     domain: str
     created_at: datetime
 
