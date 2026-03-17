@@ -109,7 +109,7 @@ def test_list_executors(base_url, tokens, executor):
 
 @pytest.mark.functional
 def test_executor_updates_notifications_shape(base_url, executor):
-    """Executor updates should include a notifications array."""
+    """Executor updates should include a notifications array with action-oriented types."""
     headers = {"Authorization": f"Bearer {executor['api_key']}"}
 
     r = requests.get(f"{base_url}/executors/updates", headers=headers, params={"timeout": 0})
@@ -118,6 +118,11 @@ def test_executor_updates_notifications_shape(base_url, executor):
     data = r.json()
     assert "notifications" in data
     assert isinstance(data["notifications"], list)
+    for n in data["notifications"]:
+        assert "type" in n
+        assert "entity_kind" in n
+        assert "entity_id" in n
+        assert "payload" in n
 
 
 @pytest.mark.functional

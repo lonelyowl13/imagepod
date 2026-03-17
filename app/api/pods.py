@@ -10,6 +10,7 @@ from app.models.user import User
 from app.services.notification_service import create_notification
 from app.schemas.pod import PodCreate, PodUpdate, PodResponse, PodTunnelResponse
 from app.schemas.endpoint import ExecutorResponse
+from app.schemas.notification_payload import build_pod_payload, PodActionPayload
 from app.services.pod_service import (
     create_pod as svc_create,
     get_pod,
@@ -68,8 +69,8 @@ async def create_pod_route(
     try:
         pod = svc_create(db, current_user.id, body)
         pod = get_pod(db, pod.id, current_user.id)
-        payload = _format_pod_response(pod).model_dump(mode="json")
-        create_notification(db, pod.executor_id, NotificationType.POD_STATUS_CHANGED, EntityKind.POD, pod.id, payload)
+        payload = build_pod_payload(pod)
+        create_notification(db, pod.executor_id, NotificationType.CREATE_POD, EntityKind.POD, pod.id, payload)
         return _format_pod_response(pod)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -111,8 +112,8 @@ async def update_pod_route(
         if not pod:
             raise HTTPException(status_code=404, detail="Pod not found")
         pod = get_pod(db, id, current_user.id)
-        payload = _format_pod_response(pod).model_dump(mode="json")
-        create_notification(db, pod.executor_id, NotificationType.POD_STATUS_CHANGED, EntityKind.POD, pod.id, payload)
+        payload = build_pod_payload(pod)
+        create_notification(db, pod.executor_id, NotificationType.UPDATE_POD, EntityKind.POD, pod.id, payload)
         return _format_pod_response(pod)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -126,14 +127,14 @@ async def delete_pod_route(
 ):
     """Delete a pod."""
     pod = get_pod(db, id, current_user.id)
-    mark_pod_terminated(db, id, pod.executor_id)
     if not pod:
         raise HTTPException(status_code=404, detail="Pod not found")
-    payload = _format_pod_response(pod).model_dump(mode="json")
+    mark_pod_terminated(db, id, pod.executor_id)
+    payload = PodActionPayload(id=pod.id).model_dump(mode="json")
     executor_id = pod.executor_id
     entity_id = pod.id
     delete_pod(db, id, current_user.id)
-    create_notification(db, executor_id, NotificationType.POD_TERMINATED, EntityKind.POD, entity_id, payload)
+    create_notification(db, executor_id, NotificationType.DELETE_POD, EntityKind.POD, entity_id, payload)
     return {"message": "Pod deleted successfully"}
 
 
@@ -149,8 +150,8 @@ async def start_pod_route(
         if not pod:
             raise HTTPException(status_code=404, detail="Pod not found")
         pod = get_pod(db, id, current_user.id)
-        payload = _format_pod_response(pod).model_dump(mode="json")
-        create_notification(db, pod.executor_id, NotificationType.POD_STATUS_CHANGED, EntityKind.POD, pod.id, payload)
+        payload = PodActionPayload(id=pod.id).model_dump(mode="json")
+        create_notification(db, pod.executor_id, NotificationType.START_POD, EntityKind.POD, pod.id, payload)
         return _format_pod_response(pod)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -167,7 +168,7 @@ async def stop_pod_route(
     if not pod:
         raise HTTPException(status_code=404, detail="Pod not found")
     pod = get_pod(db, id, current_user.id)
-    payload = _format_pod_response(pod).model_dump(mode="json")
-    create_notification(db, pod.executor_id, NotificationType.POD_STATUS_CHANGED, EntityKind.POD, pod.id, payload)
+    payload = PodActionPayload(id=pod.id).model_dump(mode="json")
+    create_notification(db, pod.executor_id, NotificationType.STOP_POD, EntityKind.POD, pod.id, payload)
     return _format_pod_response(pod)
 

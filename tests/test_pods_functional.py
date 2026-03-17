@@ -141,6 +141,30 @@ def test_get_pod(base_url, tokens, pod):
 
 
 @pytest.mark.functional
+def test_update_pod_emits_update_notification(base_url, tokens, pod, executor):
+    """Patching a pod should emit UPDATE_POD notification to the executor."""
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    executor_headers = {"Authorization": f"Bearer {executor['api_key']}"}
+
+    r = requests.patch(
+        f"{base_url}/pods/{pod['id']}",
+        headers=headers,
+        json={"name": "UpdatedFixturePod"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "UpdatedFixturePod"
+
+    r = requests.get(f"{base_url}/executors/updates", headers=executor_headers, params={"timeout": 0})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    update_notifications = [
+        n for n in data["notifications"]
+        if n.get("entity_kind") == "POD" and n.get("type") == "UPDATE_POD" and n.get("entity_id") == pod["id"]
+    ]
+    assert len(update_notifications) >= 1, "executor should have received UPDATE_POD notification for pod patch"
+
+
+@pytest.mark.functional
 def test_start_stop_pod(base_url, tokens, pod):
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 

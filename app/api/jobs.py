@@ -8,6 +8,7 @@ from app.api.helpers import get_current_active_user
 from app.services.notification_service import create_notification
 from app.models.user import User
 from app.schemas.job import JobResponse, JobRunRequest, JobRunResponse
+from app.schemas.notification_payload import JobSubmittedPayload, JobCanceledPayload
 from app.services.job_service import (
     create_job_for_endpoint,
     get_job_by_endpoint,
@@ -30,17 +31,8 @@ async def run_job(
     """Submit a job to an endpoint"""
     try:
         job = create_job_for_endpoint(db, endpoint_id, current_user.id, job_request.input)
-        payload = JobResponse(
-            id=job.id,
-            delay_time=job.delay_time,
-            execution_time=job.execution_time,
-            output=job.output_data,
-            input=job.input_data,
-            status=job.status,
-            endpoint_id=job.endpoint_id,
-            executor_id=job.executor_id,
-        ).model_dump(mode="json")
-        create_notification(db, job.executor_id, NotificationType.JOB_CHANGED, EntityKind.JOB, job.id, payload)
+        payload = JobSubmittedPayload(id=job.id, endpoint_id=job.endpoint_id).model_dump(mode="json")
+        create_notification(db, job.executor_id, NotificationType.JOB_SUBMITTED, EntityKind.JOB, job.id, payload)
         conn = getattr(request.app.state, "rabbitmq", None)
         if conn:
             await publish_job_notification(conn, job.executor_id)
@@ -95,17 +87,8 @@ async def cancel_job_route(
     cancelled = cancel_job(db, job_id)
     if not cancelled:
         raise HTTPException(status_code=404, detail="Job not found")
-    payload = JobResponse(
-        id=cancelled.id,
-        delay_time=cancelled.delay_time,
-        execution_time=cancelled.execution_time,
-        output=cancelled.output_data,
-        input=cancelled.input_data,
-        status=cancelled.status,
-        endpoint_id=cancelled.endpoint_id,
-        executor_id=cancelled.executor_id,
-    ).model_dump(mode="json")
-    create_notification(db, cancelled.executor_id, NotificationType.JOB_CHANGED, EntityKind.JOB, cancelled.id, payload)
+    payload = JobCanceledPayload(id=cancelled.id, endpoint_id=cancelled.endpoint_id).model_dump(mode="json")
+    create_notification(db, cancelled.executor_id, NotificationType.JOB_CANCELED, EntityKind.JOB, cancelled.id, payload)
     return JobResponse(
         id=cancelled.id,
         delay_time=cancelled.delay_time,

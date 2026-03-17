@@ -174,9 +174,10 @@ def test_process_job(base_url, tokens, executor):
     data = r.json()
     assert "notifications" in data
     assert isinstance(data["notifications"], list)
-    # at least one notification should be for this job
+    # at least one notification should be for this job (action-oriented type)
     job_notifications = [n for n in data["notifications"] if n.get("entity_kind") == "JOB" and n.get("entity_id") == job_id]
     assert len(job_notifications) >= 1, "executor should have received a notification for the new job"
+    assert job_notifications[0].get("type") == "JOB_SUBMITTED", "job notification should use JOB_SUBMITTED type"
 
     body = {
         "delay_time": 123,

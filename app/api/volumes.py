@@ -15,6 +15,7 @@ from app.schemas.volume import (
     VolumeMountRequest,
     VolumeMountResponse,
 )
+from app.schemas.notification_payload import VolumePayload, MountVolumePayload, UnmountVolumePayload
 from app.services.volume_service import (
     create_volume as svc_create,
     get_volume,
@@ -38,8 +39,8 @@ async def create_volume_route(
     """Create a new volume on a specific executor."""
     try:
         volume = svc_create(db, current_user.id, data)
-        payload = VolumeResponse.model_validate(volume, from_attributes=True).model_dump(mode="json")
-        create_notification(db, volume.executor_id, NotificationType.VOLUME_CHANGED, EntityKind.VOLUME, volume.id, payload)
+        payload = VolumePayload(id=volume.id, name=volume.name).model_dump(mode="json")
+        create_notification(db, volume.executor_id, NotificationType.CREATE_VOLUME, EntityKind.VOLUME, volume.id, payload)
         return volume
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -78,8 +79,8 @@ async def update_volume_route(
     updated = update_volume(db, volume_id, current_user.id, data)
     if not updated:
         raise HTTPException(status_code=404, detail="Volume not found")
-    payload = VolumeResponse.model_validate(updated, from_attributes=True).model_dump(mode="json")
-    create_notification(db, updated.executor_id, NotificationType.VOLUME_CHANGED, EntityKind.VOLUME, updated.id, payload)
+    payload = VolumePayload(id=updated.id, name=updated.name).model_dump(mode="json")
+    create_notification(db, updated.executor_id, NotificationType.UPDATE_VOLUME, EntityKind.VOLUME, updated.id, payload)
     return updated
 
 
@@ -93,11 +94,7 @@ async def delete_volume_route(
     volume = get_volume(db, volume_id, current_user.id)
     if not volume:
         raise HTTPException(status_code=404, detail="Volume not found")
-    payload = VolumeResponse.model_validate(volume, from_attributes=True).model_dump(mode="json")
-    executor_id = volume.executor_id
-    entity_id = volume.id
     delete_volume(db, volume_id, current_user.id)
-    create_notification(db, executor_id, NotificationType.VOLUME_DELETED, EntityKind.VOLUME, entity_id, payload)
     return {"message": "Volume deleted successfully"}
 
 
@@ -113,8 +110,13 @@ async def mount_volume_route(
         ev = mount_volume(db, current_user.id, endpoint_id, body.volume_id, body.mount_path)
         ev_with_vol = get_mounts_for_endpoint(db, endpoint_id)
         matched = next((m for m in ev_with_vol if m.id == ev.id), ev)
-        payload = VolumeMountResponse.model_validate(matched, from_attributes=True).model_dump(mode="json")
-        create_notification(db, matched.volume.executor_id, NotificationType.VOLUME_MOUNTED, EntityKind.VOLUME, matched.id, payload)
+        payload = MountVolumePayload(
+            endpoint_id=endpoint_id,
+            volume_id=matched.volume_id,
+            volume_name=matched.volume.name,
+            mount_path=matched.mount_path,
+        ).model_dump(mode="json")
+        create_notification(db, matched.volume.executor_id, NotificationType.MOUNT_VOLUME, EntityKind.VOLUME, matched.volume_id, payload)
         return matched
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -132,12 +134,11 @@ async def unmount_volume_route(
     mount = next((m for m in mounts if m.volume_id == volume_id), None)
     if not mount:
         raise HTTPException(status_code=404, detail="Mount not found")
-    payload = VolumeMountResponse.model_validate(mount, from_attributes=True).model_dump(mode="json")
     executor_id = mount.volume.executor_id
-    entity_id = mount.id
     if not unmount_volume(db, current_user.id, endpoint_id, volume_id):
         raise HTTPException(status_code=404, detail="Mount not found")
-    create_notification(db, executor_id, NotificationType.VOLUME_UNMOUNTED, EntityKind.VOLUME, entity_id, payload)
+    payload = UnmountVolumePayload(endpoint_id=endpoint_id, volume_id=volume_id).model_dump(mode="json")
+    create_notification(db, executor_id, NotificationType.UNMOUNT_VOLUME, EntityKind.VOLUME, volume_id, payload)
     return {"message": "Volume unmounted successfully"}
 
 
