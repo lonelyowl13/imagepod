@@ -84,7 +84,7 @@ class EndpointUpdateItem(BaseModel):
 
 
 class ExecutorUpdatesResponse(BaseModel):
-    """Response for GET /executors/updates: pending notifications."""
+    """Response for GET /executor_api/updates: pending notifications."""
     notifications: List[Notification]
 
 

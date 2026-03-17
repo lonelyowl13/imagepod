@@ -19,7 +19,7 @@ async def connect(rabbitmq_url: str) -> AbstractConnection:
 
 
 async def publish_job_notification(connection: AbstractConnection, executor_id: int) -> None:
-    """Notify executor of an update (new job or endpoint). Wakes long-poll /executors/updates."""
+    """Notify executor of an update (new job or endpoint). Wakes long-poll /executor_api/updates."""
     channel: AbstractChannel = await connection.channel()
     queue_name = _queue_name(executor_id)
     await channel.declare_queue(queue_name, durable=False, auto_delete=True)

@@ -6,6 +6,7 @@ from app.models.executor import Executor, ExecutorShare
 from app.models.user import User
 from app.models.job import Job
 from app.models.endpoint import Endpoint
+from app.models.pod import Pod
 from app.models.volume import EndpointVolume
 from app.utils import hash_key, generate_api_key
 
@@ -98,6 +99,32 @@ def update_job_for_executor(
 
 def get_endpoints_for_executor(db: Session, executor_id: int) -> List[Endpoint]:
     return db.query(Endpoint).filter(Endpoint.executor_id == executor_id).all()
+
+
+def get_endpoints_for_executor_with_details(db: Session, executor_id: int) -> List[Endpoint]:
+    """Return endpoints for this executor with template and volume_mounts loaded (for full payload)."""
+    return (
+        db.query(Endpoint)
+        .options(
+            joinedload(Endpoint.template),
+            joinedload(Endpoint.volume_mounts).joinedload(EndpointVolume.volume),
+        )
+        .filter(Endpoint.executor_id == executor_id)
+        .all()
+    )
+
+
+def get_pods_for_executor(db: Session, executor_id: int) -> List[Pod]:
+    """Return pods assigned to this executor, with template and tunnels loaded."""
+    return (
+        db.query(Pod)
+        .options(
+            joinedload(Pod.template),
+            joinedload(Pod.tunnels),
+        )
+        .filter(Pod.executor_id == executor_id)
+        .all()
+    )
 
 
 def get_endpoints_for_executor_by_status(

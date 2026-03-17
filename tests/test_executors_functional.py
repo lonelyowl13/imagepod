@@ -77,7 +77,7 @@ def executor(base_url, tokens):
 
     # Register executor with fake specs so compute_type etc. are set
     r = requests.post(
-        f"{base_url}/executors/register",
+        f"{base_url}/executor_api/register",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "gpu": "Test GPU",
@@ -112,7 +112,7 @@ def test_executor_updates_notifications_shape(base_url, executor):
     """Executor updates should include a notifications array with action-oriented types."""
     headers = {"Authorization": f"Bearer {executor['api_key']}"}
 
-    r = requests.get(f"{base_url}/executors/updates", headers=headers, params={"timeout": 0})
+    r = requests.get(f"{base_url}/executor_api/updates", headers=headers, params={"timeout": 0})
 
     assert r.status_code == 200, r.text
     data = r.json()

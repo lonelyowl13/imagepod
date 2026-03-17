@@ -10,7 +10,7 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0"
 from app.database import engine, Base
-from app.api import auth, jobs, endpoints, templates, executors, volumes, runpod, pods
+from app.api import auth, jobs, endpoints, templates, executors, executor_api, volumes, runpod, pods
 from app.api import frp as frp_router
 from app.rabbitmq import connect as rabbitmq_connect
 
@@ -65,6 +65,7 @@ app.include_router(jobs.router)
 app.include_router(endpoints.router)
 app.include_router(templates.router)
 app.include_router(executors.router)
+app.include_router(executor_api.router)
 app.include_router(volumes.router)
 app.include_router(runpod.router)
 app.include_router(pods.router)

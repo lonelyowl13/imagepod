@@ -64,7 +64,7 @@ def executor(base_url, tokens):
 
     # Register executor with fake specs so compute_type etc. are set (required for pods/endpoints)
     r = requests.post(
-        f"{base_url}/executors/register",
+        f"{base_url}/executor_api/register",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "gpu": "Test GPU",
@@ -154,7 +154,7 @@ def test_update_pod_emits_update_notification(base_url, tokens, pod, executor):
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "UpdatedFixturePod"
 
-    r = requests.get(f"{base_url}/executors/updates", headers=executor_headers, params={"timeout": 0})
+    r = requests.get(f"{base_url}/executor_api/updates", headers=executor_headers, params={"timeout": 0})
     assert r.status_code == 200, r.text
     data = r.json()
     update_notifications = [

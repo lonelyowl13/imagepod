@@ -2,6 +2,10 @@
 
 ImagePod is a small FastAPI backend that provides a Runpod‑style API for running arbitrary jobs on remote GPUs. It exposes endpoints for authentication, jobs, pods, executors, templates, volumes and more, backed by Postgres, Redis, RabbitMQ and MinIO.
 
+**API groups:**
+- `/executors` — user-facing executor management (add, list, share, delete)
+- `/executor_api` — executor-only control plane (register, updates, job/endpoint status, endpoints list, pods list)
+
 This is work in progress.
 
 ### Tech stack

@@ -98,7 +98,7 @@ def executor(base_url, tokens):
         "metadata": {}
     }
 
-    r = requests.post(f"{base_url}/executors/register", headers=headers, json=body)
+    r = requests.post(f"{base_url}/executor_api/register", headers=headers, json=body)
     assert r.status_code == 200, r.text
 
     return {
@@ -149,7 +149,7 @@ def test_process_job(base_url, tokens, executor):
     endpoint = r.json()[0]
 
     # set endpoint status to "ready"
-    r = requests.patch(f"{base_url}/executors/endpoints/{endpoint["id"]}", headers=executor_headers, 
+    r = requests.patch(f"{base_url}/executor_api/endpoints/{endpoint['id']}", headers=executor_headers, 
     json={"status": "READY"})
 
     assert r.status_code == 200, r.text
@@ -168,7 +168,7 @@ def test_process_job(base_url, tokens, executor):
 
     # executor gets updates (notifications include new job)
     job_id = job_response["id"]
-    r = requests.get(f"{base_url}/executors/updates", headers=executor_headers, params={"timeout": 0})
+    r = requests.get(f"{base_url}/executor_api/updates", headers=executor_headers, params={"timeout": 0})
 
     assert r.status_code == 200, r.text
     data = r.json()
@@ -189,7 +189,7 @@ def test_process_job(base_url, tokens, executor):
     }
 
     # executor completed the job
-    r = requests.patch(f"{base_url}/executors/job/{job_id}", headers=executor_headers, json=body)
+    r = requests.patch(f"{base_url}/executor_api/job/{job_id}", headers=executor_headers, json=body)
 
     assert r.status_code == 200, r.text
 

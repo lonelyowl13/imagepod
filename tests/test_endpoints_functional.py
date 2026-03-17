@@ -82,7 +82,7 @@ def executor(base_url, tokens):
 
     # Register executor with fake specs so compute_type etc. are set
     r = requests.post(
-        f"{base_url}/executors/register",
+        f"{base_url}/executor_api/register",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "gpu": "Test GPU",
