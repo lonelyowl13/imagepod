@@ -8,7 +8,7 @@ from app.enums import EntityKind, NotificationType
 from app.api.helpers import format_template_response, get_current_active_user
 from app.models.user import User
 from app.services.notification_service import create_notification
-from app.schemas.pod import PodCreate, PodUpdate, PodResponse
+from app.schemas.pod import PodCreate, PodUpdate, PodResponse, PodTunnelResponse
 from app.schemas.endpoint import ExecutorResponse
 from app.services.pod_service import (
     create_pod as svc_create,
@@ -54,6 +54,7 @@ def _format_pod_response(pod) -> PodResponse:
         template=format_template_response(pod.template),
         executor=_format_executor_response(pod.executor),
         user_id=pod.user_id,
+        tunnels=[PodTunnelResponse.model_validate(t) for t in (pod.tunnels or [])],
     )
 
 

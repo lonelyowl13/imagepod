@@ -1,0 +1,22 @@
+FROM alpine:3.19
+
+ARG FRP_VERSION=0.67.0
+
+RUN apk add --no-cache ca-certificates wget \
+ && wget -qO /tmp/frp.tar.gz "https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}/frp_${FRP_VERSION}_linux_amd64.tar.gz" \
+ && tar -xzf /tmp/frp.tar.gz -C /tmp \
+ && mv /tmp/frp_${FRP_VERSION}_linux_amd64/frps /usr/local/bin/frps \
+ && chmod +x /usr/local/bin/frps \
+ && rm -rf /tmp/frp* \
+ && apk del wget
+
+WORKDIR /etc/frp
+
+# Default config path; override by mounting a different file if needed.
+COPY frps.toml /etc/frp/frps.toml
+
+EXPOSE 7000/tcp 8080/tcp 8081/tcp
+
+ENTRYPOINT ["/usr/local/bin/frps"]
+CMD ["-c", "/etc/frp/frps.toml"]
+

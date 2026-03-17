@@ -520,5 +520,3 @@ temp/
 *.njsproj
 *.sln
 *.sw?
-
-.env.minio

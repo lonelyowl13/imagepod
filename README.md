@@ -44,3 +44,30 @@ This is work in progress.
    ```
 
 Visit `http://127.0.0.1:8000/docs` for the interactive Swagger UI.
+
+### FRP tunnelling and executor auth
+
+Executors authenticate both to the HTTP API and to frps using a single secret:
+the **executor API key**. When you add an executor via:
+
+```bash
+POST /executors/add  →  { "api_key": "...", "executor_id": 5 }
+```
+
+you must:
+
+- Store `api_key` securely on the executor host.
+- Compute `executor_key_hash = sha256(api_key)` using the same algorithm as
+  `hash_key` in `app/utils.py`.
+- Configure `frpc.ini` with:
+
+  ```ini
+  [common]
+  server_addr = your-frps-hostname.example.com
+  server_port = 7000
+  metas.executor_id = 5
+  metas.executor_key_hash = <executor_key_hash>
+  ```
+
+The frps HTTP auth plugin calls `POST /internal/frp/handler`, which validates
+`executor_id` + `executor_key_hash` against the `executors.token_hash` column.

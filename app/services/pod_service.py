@@ -1,3 +1,4 @@
+import secrets
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy.orm import Session, joinedload
@@ -5,9 +6,11 @@ from sqlalchemy import desc, func
 
 from app.enums import PodStatus
 from app.models.pod import Pod
+from app.models.pod_tunnel import PodTunnel
 from app.models.template import Template
 from app.models.executor import Executor, ExecutorShare
 from app.schemas.pod import PodCreate, PodUpdate
+from app.config import settings
 
 
 def _user_can_use_executor(db: Session, executor: Executor, user_id: int) -> bool:
@@ -58,8 +61,20 @@ def create_pod(db: Session, user_id: int, data: PodCreate) -> Pod:
         status=PodStatus.STOPPED,
     )
     db.add(pod)
+    db.flush()  # assigns pod.id before creating tunnels
+
+    slug = f"pod-{pod.id}"
+    tunnel_pairs: List[tuple] = []
+    for port in (data.ports or []):
+        token = secrets.token_hex(4)  # 8 hex chars
+        domain = f"{token}-{slug}-{port}.{settings.proxy_domain}"
+        tunnel = PodTunnel(pod_id=pod.id, port=port, token=token, domain=domain)
+        db.add(tunnel)
+        tunnel_pairs.append((port, token))
+
     db.commit()
     db.refresh(pod)
+
     return pod
 
 
@@ -69,6 +84,7 @@ def get_pod(db: Session, pod_id: int, user_id: Optional[int] = None) -> Optional
         .options(
             joinedload(Pod.template),
             joinedload(Pod.executor),
+            joinedload(Pod.tunnels),
         )
         .filter(Pod.id == pod_id)
     )
@@ -83,6 +99,7 @@ def get_user_pods(db: Session, user_id: int) -> List[Pod]:
         .options(
             joinedload(Pod.template),
             joinedload(Pod.executor),
+            joinedload(Pod.tunnels),
         )
         .filter(Pod.user_id == user_id)
         .order_by(desc(Pod.created_at))

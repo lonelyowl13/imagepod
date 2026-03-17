@@ -1,0 +1,21 @@
+bindPort = 7000
+
+# HTTP vhost entry point. Nginx can proxy HTTP/WS traffic here; frps dispatches by Host header.
+vhostHTTPPort = 8080
+
+# TLS between frpc and frps. When mounting certs (e.g. docker-compose.yml), uncomment:
+# certFile = "/cert.pem"
+# keyFile = "/key.pem"
+[transport.tls]
+force = true
+
+[log]
+level = "info"
+maxDays = 7
+
+[[httpPlugins]]
+name = "executor-auth"
+addr = "http://backend:8000"
+path = "/internal/frp/handler"
+ops = ["Login"]
+

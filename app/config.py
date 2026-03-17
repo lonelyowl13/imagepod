@@ -26,7 +26,12 @@ class Settings(BaseSettings):
     
     # Kubernetes
     kubeconfig_path: Optional[str] = None
-    
+
+    # FRP tunneling
+    # Base domain for tunnel subdomains; your DNS provider should have a wildcard
+    # record *.proxy_domain pointing at the public IP of the frps host.
+    proxy_domain: str = "proxy.mydomain.com"
+
     # Environment
     environment: str = "development"
     debug: bool = True

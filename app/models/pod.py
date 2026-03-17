@@ -29,4 +29,5 @@ class Pod(Base):
     user = relationship("User", back_populates="pods")
     template = relationship("Template", backref="pods")
     executor = relationship("Executor", back_populates="pods")
+    tunnels = relationship("PodTunnel", back_populates="pod", cascade="all, delete-orphan")
 

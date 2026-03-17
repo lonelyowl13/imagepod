@@ -59,10 +59,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      POSTGRES_HOST: postgres
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +73,24 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    networks:
+      - internal
+
+  frps:
+    build:
+      context: ./frps
+      dockerfile: Dockerfile.frps
+    restart: unless-stopped
+    ports:
+      # Control connection port; must be reachable by remote frpc clients.
+      - "7000:7000"
+      # HTTP vhost port; Nginx proxies here for HTTP-type proxies.
+      - "127.0.0.1:8080:8080"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/letsencrypt/live/proxy.exampledomain.test/fullchain.pem:/cert.pem
+      - /etc/letsencrypt/live/proxy.exampledomain.test/privkey.pem:/key.pem
     networks:
       - internal
 
